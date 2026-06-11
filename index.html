@@ -6,96 +6,58 @@
 <title>網美引導 · Pose Studio</title>
 <style>
   :root{
-    --ink:#1a1714;
-    --paper:#f3ede3;
-    --blush:#e8a598;
-    --rose:#d97a6c;
-    --sage:#8a9a7b;
-    --gold:#c9a24b;
+    --ink:#1a1714;--paper:#f3ede3;--blush:#e8a598;
+    --rose:#d97a6c;--sage:#8a9a7b;--gold:#c9a24b;
     --line:rgba(255,255,255,.85);
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{height:100%}
-  body{
-    font-family:"Helvetica Neue",-apple-system,"PingFang TC","Noto Sans TC",sans-serif;
-    background:var(--ink);color:var(--paper);overflow:hidden;
-    position:fixed;width:100%;
-  }
-  /* ---------- Camera stage ---------- */
+  body{font-family:"Helvetica Neue",-apple-system,"PingFang TC","Noto Sans TC",sans-serif;
+    background:var(--ink);color:var(--paper);overflow:hidden;position:fixed;width:100%}
+
+  /* Camera stage */
   #stage{position:fixed;inset:0;background:#000;display:flex;align-items:center;justify-content:center}
   video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
   #overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 
-  /* ---------- No-camera fallback ---------- */
-  #noCam{
-    position:absolute;inset:0;display:none;flex-direction:column;
+  /* No-camera fallback */
+  #noCam{position:absolute;inset:0;display:none;flex-direction:column;
     align-items:center;justify-content:center;gap:18px;text-align:center;
-    padding:40px;background:radial-gradient(circle at 50% 30%,#2a2521,#0d0b0a);
-  }
+    padding:40px;background:radial-gradient(circle at 50% 30%,#2a2521,#0d0b0a)}
   #noCam h2{font-weight:300;font-size:22px;letter-spacing:.06em}
   #noCam p{font-size:14px;opacity:.6;max-width:280px;line-height:1.6}
   #noCam button{margin-top:8px;padding:13px 30px;border:1px solid var(--blush);
     background:transparent;color:var(--blush);border-radius:40px;font-size:14px;letter-spacing:.12em}
 
-  /* ---------- Top bar ---------- */
+  /* Top bar */
   #topbar{position:absolute;top:0;left:0;right:0;z-index:6;
-    padding:calc(env(safe-area-inset-top) + 14px) 18px 14px;
+    padding:calc(env(safe-area-inset-top) + 14px) 16px 14px;
     display:flex;align-items:center;justify-content:space-between;
     background:linear-gradient(#000a,transparent)}
   .brand{font-size:13px;letter-spacing:.28em;font-weight:300;opacity:.92}
   .brand b{color:var(--blush);font-weight:600}
-  .iconbtn{width:40px;height:40px;border-radius:50%;border:1px solid #fff3;
-    background:#0004;backdrop-filter:blur(8px);color:#fff;font-size:17px;
+  .topbtns{display:flex;gap:7px}
+  .iconbtn{width:36px;height:36px;border-radius:50%;border:1px solid #fff3;
+    background:#0004;backdrop-filter:blur(8px);color:#fff;font-size:15px;
     display:flex;align-items:center;justify-content:center}
+  #torchBtn{display:none}
+  #torchBtn.on{color:#ffd700;border-color:#ffd700}
+  #gridBtn.on{color:var(--blush);border-color:var(--blush)}
 
-  /* ---------- Pose name pill ---------- */
+  /* Pose name pill */
   #poseName{position:absolute;left:50%;transform:translateX(-50%);
-    top:calc(env(safe-area-inset-top) + 66px);z-index:6;
+    top:calc(env(safe-area-inset-top) + 60px);z-index:6;
     background:#0006;backdrop-filter:blur(10px);border:1px solid #fff2;
     padding:7px 18px;border-radius:30px;font-size:12px;letter-spacing:.14em;
     display:flex;align-items:center;gap:9px;white-space:nowrap}
   #poseName .dot{width:6px;height:6px;border-radius:50%;background:var(--blush)}
   #poseTip{position:absolute;left:50%;transform:translateX(-50%);
-    top:calc(env(safe-area-inset-top) + 102px);z-index:6;
+    top:calc(env(safe-area-inset-top) + 96px);z-index:6;
     font-size:11px;opacity:.7;letter-spacing:.04em;text-align:center;
-    max-width:78%;line-height:1.5;text-shadow:0 1px 3px #000}
+    max-width:72%;line-height:1.5;text-shadow:0 1px 3px #000}
 
-  /* ---------- Bottom controls ---------- */
-  #bottom{position:absolute;left:0;right:0;bottom:0;z-index:6;
-    padding:14px 0 calc(env(safe-area-inset-bottom) + 16px);
-    background:linear-gradient(transparent,#000b 40%)}
-
-  /* category tabs */
-  #cats{display:flex;gap:8px;overflow-x:auto;padding:0 18px 14px;scrollbar-width:none}
-  #cats::-webkit-scrollbar{display:none}
-  .cat{flex:0 0 auto;padding:8px 16px;border-radius:30px;font-size:12px;
-    letter-spacing:.08em;border:1px solid #fff3;background:#0003;color:#fff;
-    backdrop-filter:blur(6px);transition:.2s}
-  .cat.on{background:var(--paper);color:var(--ink);border-color:var(--paper);font-weight:600}
-
-  /* pose thumbnails strip */
-  #poses{display:flex;gap:10px;overflow-x:auto;padding:0 18px 16px;scrollbar-width:none}
-  #poses::-webkit-scrollbar{display:none}
-  .pose{flex:0 0 auto;width:54px;height:72px;border-radius:12px;
-    border:1.5px solid #fff3;background:#fff1;position:relative;overflow:hidden;
-    transition:.2s;display:flex;align-items:center;justify-content:center}
-  .pose.on{border-color:var(--blush);box-shadow:0 0 0 2px var(--blush)}
-  .pose svg{width:100%;height:100%}
-  .pose span{position:absolute;bottom:3px;left:0;right:0;text-align:center;
-    font-size:8px;letter-spacing:.05em;opacity:.85}
-
-  /* shutter row */
-  #shutterRow{display:flex;align-items:center;justify-content:center;gap:42px;padding:4px 0 2px}
-  #shutter{width:72px;height:72px;border-radius:50%;border:4px solid #fff;
-    background:#fff;position:relative;transition:.1s}
-  #shutter:active{transform:scale(.92)}
-  #shutter::after{content:"";position:absolute;inset:4px;border:2px solid var(--ink);border-radius:50%}
-  .sidebtn{width:50px;height:50px;border-radius:50%;border:1px solid #fff3;
-    background:#0004;backdrop-filter:blur(8px);color:#fff;font-size:18px;
-    display:flex;align-items:center;justify-content:center}
-
-  /* zoom control */
-  #zoomCtrl{position:absolute;right:14px;top:50%;transform:translateY(-50%);
+  /* Zoom control (right side) */
+  #zoomCtrl{position:absolute;right:12px;top:50%;transform:translateY(-50%);
     z-index:6;display:flex;flex-direction:column;align-items:center;gap:8px;
     background:#0007;backdrop-filter:blur(8px);border:1px solid #fff2;
     border-radius:30px;padding:14px 10px}
@@ -105,63 +67,54 @@
     position:absolute;cursor:pointer}
   #zoomLabel{font-size:10px;letter-spacing:.04em;opacity:.8;color:var(--blush)}
 
-  /* grid toggle state */
-  #gridLines{stroke:var(--line);stroke-width:1;opacity:0;transition:.3s;vector-effect:non-scaling-stroke}
-  #gridLines.show{opacity:.45}
+  /* Tap-to-focus ring */
+  #focusRing{position:fixed;z-index:7;width:56px;height:56px;border-radius:50%;
+    border:2px solid #fff;transform:translate(-50%,-50%) scale(1.6);
+    opacity:0;pointer-events:none;transition:transform .18s,opacity .18s}
+  #focusRing.active{transform:translate(-50%,-50%) scale(1);opacity:1}
 
-  /* flash */
-  #flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:20}
+  /* Bottom controls */
+  #bottom{position:absolute;left:0;right:0;bottom:0;z-index:6;
+    padding:14px 0 calc(env(safe-area-inset-bottom) + 16px);
+    background:linear-gradient(transparent,#000b 40%)}
+  #cats{display:flex;gap:8px;overflow-x:auto;padding:0 18px 14px;scrollbar-width:none}
+  #cats::-webkit-scrollbar{display:none}
+  .cat{flex:0 0 auto;padding:8px 16px;border-radius:30px;font-size:12px;
+    letter-spacing:.08em;border:1px solid #fff3;background:#0003;color:#fff;
+    backdrop-filter:blur(6px);transition:.2s}
+  .cat.on{background:var(--paper);color:var(--ink);border-color:var(--paper);font-weight:600}
+  #poses{display:flex;gap:10px;overflow-x:auto;padding:0 18px 16px;scrollbar-width:none}
+  #poses::-webkit-scrollbar{display:none}
+  .pose{flex:0 0 auto;width:54px;height:72px;border-radius:12px;
+    border:1.5px solid #fff3;background:#fff1;position:relative;overflow:hidden;
+    transition:.2s;display:flex;align-items:center;justify-content:center}
+  .pose.on{border-color:var(--blush);box-shadow:0 0 0 2px var(--blush)}
+  .pose svg{width:100%;height:100%}
+  #shutterRow{display:flex;align-items:center;justify-content:center;gap:42px;padding:4px 0 2px}
+  #shutter{width:72px;height:72px;border-radius:50%;border:4px solid #fff;
+    background:#fff;position:relative;transition:.1s}
+  #shutter:active{transform:scale(.92)}
+  #shutter::after{content:"";position:absolute;inset:4px;border:2px solid var(--ink);border-radius:50%}
+  .sidebtn{width:50px;height:50px;border-radius:50%;border:1px solid #fff3;
+    background:#0004;backdrop-filter:blur(8px);color:#fff;font-size:18px;
+    display:flex;align-items:center;justify-content:center}
 
-  /* captured preview */
-  #shot{position:fixed;inset:0;z-index:30;background:#000;display:none;flex-direction:column}
-  #shot img{flex:1;width:100%;object-fit:contain;min-height:0}
-  #shotBar{padding:18px 24px calc(env(safe-area-inset-bottom) + 22px);
-    display:flex;gap:14px;justify-content:center}
-  #shotBar button{flex:1;max-width:160px;padding:14px;border-radius:30px;font-size:14px;
-    letter-spacing:.06em;border:none}
-  .retake{background:#fff2;color:#fff;border:1px solid #fff3 !important}
-  .save{background:var(--blush);color:var(--ink);font-weight:600}
-
-  /* reference example button */
-  #refBtn{position:absolute;right:18px;z-index:6;
+  /* Reference example button */
+  #refBtn{position:absolute;left:14px;z-index:6;
     top:calc(env(safe-area-inset-top) + 60px);
     background:#0006;backdrop-filter:blur(10px);border:1px solid var(--blush);
     color:var(--blush);padding:8px 14px;border-radius:30px;font-size:11px;
     letter-spacing:.1em;display:flex;align-items:center;gap:6px}
   #refBtn svg{width:13px;height:13px}
 
-  /* reference sheet */
-  #refSheet{position:fixed;inset:0;z-index:35;background:#0d0b0aee;
-    backdrop-filter:blur(6px);display:none;flex-direction:column}
-  #refSheet header{padding:calc(env(safe-area-inset-top) + 18px) 22px 16px;
-    display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #fff1}
-  #refSheet header .t{font-size:15px;letter-spacing:.06em}
-  #refSheet header .t small{display:block;font-size:11px;opacity:.5;margin-top:3px;letter-spacing:.02em}
-  #refSheet header button{width:34px;height:34px;border-radius:50%;border:1px solid #fff3;
-    background:#fff1;color:#fff;font-size:16px}
-  #refBody{flex:1;overflow-y:auto;padding:20px 22px calc(env(safe-area-inset-bottom) + 24px)}
-  .refCard{margin-bottom:14px;border:1px solid #fff2;border-radius:16px;
-    padding:18px;background:#fff0a;display:flex;flex-direction:column;gap:10px}
-  .refCard h4{font-size:14px;font-weight:500;letter-spacing:.04em;color:var(--blush)}
-  .refCard p{font-size:12.5px;line-height:1.7;opacity:.8}
-  .refCard a{margin-top:4px;display:inline-flex;align-items:center;justify-content:center;
-    gap:8px;padding:13px;border-radius:30px;background:var(--blush);color:var(--ink);
-    font-size:13px;font-weight:600;letter-spacing:.06em;text-decoration:none}
-  .refCard a svg{width:15px;height:15px}
-  .refNote{font-size:11px;opacity:.45;line-height:1.7;letter-spacing:.02em;margin-top:6px}
-
-  /* imported reference image overlay */
-  #refImg{position:absolute;pointer-events:none;z-index:4;display:none;
-    object-fit:contain}
+  /* Reference image overlay */
+  #refImg{position:absolute;pointer-events:none;z-index:4;display:none;object-fit:contain}
   #refImg.full{inset:0;width:100%;height:100%}
   #refImg.corner{width:30%;max-width:140px;border-radius:10px;
     border:2px solid #fff9;box-shadow:0 4px 20px #000a;object-fit:cover}
-  #refImg.corner.tl{top:calc(env(safe-area-inset-top) + 110px);left:14px}
-
-  /* reference control bar (shown when ref image loaded) */
+  #refImg.corner.tl{top:calc(env(safe-area-inset-top)+110px);left:14px}
   #refCtrl{position:absolute;left:0;right:0;z-index:6;display:none;
-    bottom:calc(env(safe-area-inset-bottom) + 252px);
-    padding:0 18px}
+    bottom:calc(env(safe-area-inset-bottom)+252px);padding:0 18px}
   #refCtrl .box{background:#000a;backdrop-filter:blur(10px);border:1px solid #fff2;
     border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
   #refCtrl .row{display:flex;align-items:center;gap:10px}
@@ -173,7 +126,67 @@
   #refCtrl .modes button.on{background:var(--blush);color:var(--ink);border-color:var(--blush);font-weight:600}
   #refCtrl .clear{background:none;border:none;color:#ff9a8c;font-size:11px;letter-spacing:.06em;text-decoration:underline;align-self:flex-end}
 
-  /* intro */
+  /* Grid */
+  #gridLines{stroke:var(--line);stroke-width:1;opacity:0;transition:.3s;vector-effect:non-scaling-stroke}
+  #gridLines.show{opacity:.45}
+
+  /* Flash */
+  #flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:20}
+
+  /* Captured preview */
+  #shot{position:fixed;inset:0;z-index:30;background:#000;display:none;flex-direction:column}
+  #shot img{flex:1;width:100%;object-fit:contain;min-height:0}
+  #shotBar{padding:18px 24px calc(env(safe-area-inset-bottom)+22px);display:flex;gap:14px;justify-content:center}
+  #shotBar button{flex:1;max-width:160px;padding:14px;border-radius:30px;font-size:14px;letter-spacing:.06em;border:none}
+  .retake{background:#fff2;color:#fff;border:1px solid #fff3 !important}
+  .save{background:var(--blush);color:var(--ink);font-weight:600}
+
+  /* Reference sheet */
+  #refSheet{position:fixed;inset:0;z-index:35;background:#0d0b0aee;
+    backdrop-filter:blur(6px);display:none;flex-direction:column}
+  #refSheet header{padding:calc(env(safe-area-inset-top)+18px) 22px 16px;
+    display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #fff1}
+  #refSheet header .t{font-size:15px;letter-spacing:.06em}
+  #refSheet header .t small{display:block;font-size:11px;opacity:.5;margin-top:3px;letter-spacing:.02em}
+  #refSheet header button{width:34px;height:34px;border-radius:50%;border:1px solid #fff3;background:#fff1;color:#fff;font-size:16px}
+  #refBody{flex:1;overflow-y:auto;padding:20px 22px calc(env(safe-area-inset-bottom)+24px)}
+  .refCard{margin-bottom:14px;border:1px solid #fff2;border-radius:16px;padding:18px;background:#fff0a;display:flex;flex-direction:column;gap:10px}
+  .refCard h4{font-size:14px;font-weight:500;letter-spacing:.04em;color:var(--blush)}
+  .refCard p{font-size:12.5px;line-height:1.7;opacity:.8}
+  .refCard a{margin-top:4px;display:inline-flex;align-items:center;justify-content:center;
+    gap:8px;padding:13px;border-radius:30px;background:var(--blush);color:var(--ink);
+    font-size:13px;font-weight:600;letter-spacing:.06em;text-decoration:none}
+  .refCard a svg{width:15px;height:15px}
+  .refNote{font-size:11px;opacity:.45;line-height:1.7;letter-spacing:.02em;margin-top:6px}
+
+  /* Camera settings panel */
+  #camPanel{position:fixed;inset:0;z-index:38;display:none;flex-direction:column;justify-content:flex-end}
+  #camPanel.open{display:flex}
+  #camPanelBg{position:absolute;inset:0;background:#0009}
+  #camSheet{position:relative;background:#1c1815;border-top:1px solid #fff2;
+    border-radius:20px 20px 0 0;max-height:78vh;display:flex;flex-direction:column}
+  #camHandle{width:36px;height:4px;border-radius:2px;background:#fff3;margin:12px auto 2px}
+  #camHead{display:flex;align-items:center;justify-content:space-between;
+    padding:8px 20px 12px;border-bottom:1px solid #fff1}
+  #camHead .ht{font-size:15px;letter-spacing:.06em}
+  #camHead button{width:30px;height:30px;border-radius:50%;border:1px solid #fff3;background:#fff1;color:#fff;font-size:14px}
+  #cpBody{flex:1;overflow-y:auto;padding:16px 20px calc(env(safe-area-inset-bottom)+20px)}
+  .cpSec{margin-bottom:20px}
+  .cpTitle{font-size:10px;letter-spacing:.14em;opacity:.45;margin-bottom:10px;text-transform:uppercase}
+  .cpRow{display:flex;align-items:center;gap:8px;margin-bottom:11px}
+  .cpLab{font-size:12px;opacity:.8;min-width:56px;flex-shrink:0}
+  .cpRange{flex:1;accent-color:var(--blush);height:3px;cursor:pointer}
+  .cpVal{font-size:11px;opacity:.55;min-width:40px;text-align:right}
+  .cpSel{flex:1;background:#fff1;border:1px solid #fff2;color:#fff;
+    padding:7px 10px;border-radius:10px;font-size:12px}
+  .cpTog{display:flex;gap:6px;flex:1}
+  .cpTog button{flex:1;padding:8px 4px;border-radius:16px;font-size:11px;
+    letter-spacing:.04em;border:1px solid #fff3;background:#fff1;color:#fff}
+  .cpTog button.on{background:var(--blush);color:var(--ink);border-color:var(--blush);font-weight:600}
+  .cpNote{font-size:11px;opacity:.45;line-height:1.6;letter-spacing:.02em}
+  .cpEmpty{text-align:center;padding:24px 0;font-size:13px;opacity:.4;letter-spacing:.04em}
+
+  /* Intro */
   #intro{position:fixed;inset:0;z-index:40;background:var(--ink);
     display:flex;flex-direction:column;align-items:center;justify-content:center;
     gap:22px;text-align:center;padding:40px;transition:opacity .5s}
@@ -199,25 +212,43 @@
     <g id="guideLayer"></g>
   </svg>
   <img id="refImg" alt="">
-  <div id="noCam">
-    <h2>需要相機權限</h2>
-    <p>允許相機後，畫面上會出現姿勢導引線，對齊就能拍出網美角度。</p>
-    <button id="retry">重新嘗試開啟相機</button>
-  </div>
   <div id="zoomCtrl">
     <div id="zoomTrack">
       <input type="range" id="zoomSlider" min="1" max="5" value="1" step="0.1">
     </div>
     <span id="zoomLabel">1×</span>
   </div>
+  <div id="noCam">
+    <h2>需要相機權限</h2>
+    <p>允許相機後，畫面上會出現姿勢導引線，對齊就能拍出網美角度。</p>
+    <button id="retry">重新嘗試開啟相機</button>
+  </div>
 </div>
+
+<div id="focusRing"></div>
 
 <div id="topbar">
   <div class="brand">POSE<b>·</b>STUDIO</div>
-  <button class="iconbtn" id="gridBtn">⊞</button>
+  <div class="topbtns">
+    <button class="iconbtn" id="torchBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+      </svg>
+    </button>
+    <button class="iconbtn" id="gridBtn">⊞</button>
+    <button class="iconbtn" id="camSettingsBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </button>
+  </div>
 </div>
 
-<button id="refBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>看範例照</button>
+<button id="refBtn">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+  看範例照
+</button>
 
 <div id="poseName"><span class="dot"></span><span id="poseLabel">斜肩側身</span></div>
 <div id="poseTip">身體側 45 度，重心放後腳，上巴微收</div>
@@ -226,7 +257,7 @@
   <div class="box">
     <div class="modes">
       <button id="mFull" class="on">全畫面（半透）</button>
-      <button id="mCorner">貼角落（縮圖透）</button>
+      <button id="mCorner">貼角落（縮圖）</button>
     </div>
     <div class="row">
       <span class="lab">透明度</span>
@@ -242,7 +273,13 @@
   <div id="cats"></div>
   <div id="poses"></div>
   <div id="shutterRow">
-    <button class="sidebtn" id="flipBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg></button>
+    <button class="sidebtn" id="flipBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+        <polyline points="1 4 1 10 7 10"/>
+        <polyline points="23 20 23 14 17 14"/>
+        <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+      </svg>
+    </button>
     <button id="shutter"></button>
     <button class="sidebtn" id="randomBtn">⁎</button>
   </div>
@@ -266,6 +303,19 @@
   <div id="refBody"></div>
 </div>
 
+<!-- Camera settings panel -->
+<div id="camPanel">
+  <div id="camPanelBg"></div>
+  <div id="camSheet">
+    <div id="camHandle"></div>
+    <div id="camHead">
+      <div class="ht">相機設定</div>
+      <button id="camClose">✕</button>
+    </div>
+    <div id="cpBody"></div>
+  </div>
+</div>
+
 <div id="intro">
   <div class="logo">網 美 姿 勢 引 導</div>
   <h1>對齊<em>角度</em><br>拍出<em>網美感</em></h1>
@@ -278,111 +328,73 @@
 <script>
 const A=s=>document.querySelector(s);
 
-/* ---------- Pose library ----------
-   Each pose has an SVG guide drawn in a 100 x 140 viewBox (portrait).
-   Stick-figure + framing cues, semi-transparent. */
-const G='var(--blush)';
-function fig(parts){return parts}
-
+/* -------- Pose library -------- */
 const CATS=[
-  {id:'cafe', name:'咖啡廳 / 室內'},
-  {id:'nature', name:'自然 / 山海'},
-  {id:'city', name:'街市 / 地標'},
+  {id:'cafe',name:'咖啡廳 / 室內'},
+  {id:'nature',name:'自然 / 山海'},
+  {id:'city',name:'街市 / 地標'},
 ];
-
-// helper builders for guide svg strings
 const stroke=`stroke="#ffb7a8" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"`;
 const soft=`stroke="#ffffff" stroke-width="1" fill="none" stroke-dasharray="3 3" opacity="0.55" vector-effect="non-scaling-stroke"`;
 const head=(x,y,r=6)=>`<circle cx="${x}" cy="${y}" r="${r}" ${stroke}/>`;
 const lbl=(x,y,t)=>`<text x="${x}" y="${y}" fill="#ffd9cf" font-size="4.2" text-anchor="middle" opacity="0.9" font-family="sans-serif">${t}</text>`;
 
 const POSES=[
-/* ===== CAFE ===== */
 {cat:'cafe',name:'捧讀坐姿',q:'咖啡廳 捧讀 網美照',
  tip:'手肘撐桌或捧著書本讀，身體坐 1/3，肩膀打直不駝背',
  howto:'身體坐椅子約 1/3 前方，肩膀打直。腿部核心稍微 hold 住，上臂輕鬆撐桌面。另一手捧讀，視線朝窗外或書本光源，臉略側 45 度更立體。',
- svg:`${head(50,40)}
-   <path d="M50 46 L50 78 M50 55 L38 64 L42 78 M50 58 L62 50 L60 42" ${stroke}/>
-   <line x1="20" y1="78" x2="80" y2="78" ${soft}/>${lbl(50,96,'桌面對齊此線')}
-   <rect x="30" y="20" width="40" height="50" rx="3" ${soft}/>${lbl(50,17,'留在上 1/3')}`},
+ svg:`${head(50,40)}<path d="M50 46 L50 78 M50 55 L38 64 L42 78 M50 58 L62 50 L60 42" ${stroke}/><line x1="20" y1="78" x2="80" y2="78" ${soft}/>${lbl(50,96,'桌面對齊此線')}<rect x="30" y="20" width="40" height="50" rx="3" ${soft}/>${lbl(50,17,'留在上 1/3')}`},
 {cat:'cafe',name:'低頭翻書',q:'咖啡廳 看書 文青 氛圍',
  tip:'低頭看書，頭頂 1/3 留白空間，視線有側邊',
  howto:'拿著書自然低頭閱讀，相機平拍。頭上方留約 1/3 背景。讓自然光從側邊打入，眼睛不直視鏡頭，視若無睹給人閱讀中偷拍感，顯臉頭小輕盈。',
- svg:`${head(50,46)}
-   <path d="M50 52 L50 80 M50 60 L40 70 L46 80 M50 62 L60 70 L54 80" ${stroke}/>
-   <path d="M40 78 q10 6 20 0" ${stroke}/>${lbl(50,98,'書本水平')}
-   <line x1="50" y1="10" x2="50" y2="34" ${soft}/>${lbl(50,20,'中央對稱')}`},
+ svg:`${head(50,46)}<path d="M50 52 L50 80 M50 60 L40 70 L46 80 M50 62 L60 70 L54 80" ${stroke}/><path d="M40 78 q10 6 20 0" ${stroke}/>${lbl(50,98,'書本水平')}<line x1="50" y1="10" x2="50" y2="34" ${soft}/>${lbl(50,20,'中央對稱')}`},
 {cat:'cafe',name:'端杯微笑',q:'咖啡廳 拿咖啡杯 文青照',
  tip:'優雅端杯靠近下巴，手臂用杯蓋起，腰骨顯細',
  howto:'優雅端杯把嘴到踏板。靠近下巴，手臂稍微舉起不要趴貼身，肩頭微斜，骨骼線條細膩自然就出來了。眼睛看鏡頭微笑。',
- svg:`${head(50,38)}
-   <path d="M50 44 L50 72 M50 50 L40 58 L44 62 M50 50 L60 58 L56 62" ${stroke}/>
-   <rect x="44" y="58" width="12" height="9" rx="2" ${stroke}/>${lbl(50,90,'杯子在踏板上')}`},
+ svg:`${head(50,38)}<path d="M50 44 L50 72 M50 50 L40 58 L44 62 M50 50 L60 58 L56 62" ${stroke}/><rect x="44" y="58" width="12" height="9" rx="2" ${stroke}/>${lbl(50,90,'杯子在踏板上')}`},
 {cat:'cafe',name:'回眸側坐',q:'側坐回眸 文青照',
  tip:'側坐自然、數 123 自然回頭，展現氣質',
  howto:'把椅子對著旁邊那一側對鏡頭。側身坐定後讓攝影者數 1、2、3，你跟著鏡頭慢慢自然回頭，表情留住氣質感快拍快速，就能拍出感覺自然不僵硬的回眸照。',
- svg:`${head(56,40)}
-   <path d="M54 46 L46 76 M52 54 L40 58 M50 60 L44 74" ${stroke}/>
-   <path d="M40 24 q16 -8 28 4" ${soft}/>${lbl(56,96,'回頭 30 度')}`},
-
-/* ===== NATURE ===== */
+ svg:`${head(56,40)}<path d="M54 46 L46 76 M52 54 L40 58 M50 60 L44 74" ${stroke}/><path d="M40 24 q16 -8 28 4" ${soft}/>${lbl(56,96,'回頭 30 度')}`},
 {cat:'nature',name:'張臂擁海',q:'海邊 張開雙臂 唯美 網美照',
  tip:'背對鏡頭張開雙臂，地平線壓在下 1/3，橫構圖',
  howto:'背對鏡頭張開雙臂擁進海景，拍橫構圖讓風景收進來。地平線壓在畫面下 1/3，腰貼近畫面下緣。頭上的 1/3，顯高和飄逸感。',
- svg:`${head(50,34)}
-   <path d="M50 40 L50 80 M50 48 L26 40 M50 48 L74 40 M50 80 L42 104 M50 80 L58 104" ${stroke}/>
-   <line x1="0" y1="93.3" x2="100" y2="93.3" ${soft}/>${lbl(50,112,'地平線在下 1/3')}`},
+ svg:`${head(50,34)}<path d="M50 40 L50 80 M50 48 L26 40 M50 48 L74 40 M50 80 L42 104 M50 80 L58 104" ${stroke}/><line x1="0" y1="93.3" x2="100" y2="93.3" ${soft}/>${lbl(50,112,'地平線在下 1/3')}`},
 {cat:'nature',name:'迎風回眸',q:'海邊 風吹頭髮 回頭 側拍',
  tip:'轉身面迎風，頭髮被吹到要回頭給側拍',
  howto:'海邊風大最好不硬拍。轉身面對迎風方向，等頭髮被統一吹到覆蓋。看到亮眼一瞬度掌握好時機回頭給側拍，笑一下氣質感美。',
- svg:`${head(54,38)}
-   <path d="M52 44 L46 80 M50 52 L40 46 M52 54 L62 60" ${stroke}/>
-   <path d="M48 32 q-10 -4 -16 4" ${soft}/>${lbl(54,98,'頭髮飄往風的方向')}`},
+ svg:`${head(54,38)}<path d="M52 44 L46 80 M50 52 L40 46 M52 54 L62 60" ${stroke}/><path d="M48 32 q-10 -4 -16 4" ${soft}/>${lbl(54,98,'頭髮飄往風的方向')}`},
 {cat:'nature',name:'靠石仰望',q:'山景 倚石 仰望 網美照',
  tip:'側倚岩石穩定站起，人物置畫面左 1/3，點綴三角',
  howto:'側倚在岩石或木椿上，一腳穩定站起形成黃金三角形，身體比例更修長。人物置在畫面左或右 1/3，視線朝前方山景，視覺留給風景。',
- svg:`${head(46,42)}
-   <path d="M46 48 L46 72 M46 56 L58 60 M46 72 L40 86 M46 72 L62 80 L62 92" ${stroke}/>
-   <line x1="24" y1="92" x2="76" y2="88" ${soft}/>${lbl(50,108,'人物靠左 1/3')}`},
+ svg:`${head(46,42)}<path d="M46 48 L46 72 M46 56 L58 60 M46 72 L40 86 M46 72 L62 80 L62 92" ${stroke}/><line x1="24" y1="92" x2="76" y2="88" ${soft}/>${lbl(50,108,'人物靠左 1/3')}`},
 {cat:'nature',name:'剪影倒映',q:'倒映 剪影 夕陽 人像',
  tip:'倒映站立、身形線條清晰，太陽落在身體邊緣',
  howto:'背對夕陽倒映站立，拍出張臂或挺直或挽髮等線條清晰的姿勢。讓太陽落在身體某邊緣，拍出夢幻感或乾淨剪影。',
- svg:`${head(50,40)}
-   <path d="M50 46 L50 84 M50 54 L38 66 M50 54 L62 66 M50 84 L42 108 M50 84 L58 108" ${stroke}/>
-   <circle cx="64" cy="50" r="7" ${soft}/>${lbl(64,40,'太陽在邊緣')}`},
-
-/* ===== CITY ===== */
+ svg:`${head(50,40)}<path d="M50 46 L50 84 M50 54 L38 66 M50 54 L62 66 M50 84 L42 108 M50 84 L58 108" ${stroke}/><circle cx="64" cy="50" r="7" ${soft}/>${lbl(64,40,'太陽在邊緣')}`},
 {cat:'city',name:'街頭走拍',q:'街頭 走路 抓拍 網美照',
  tip:'往前走、視線上看鏡頭，地標放身後 1/3 線',
  howto:'自然往前走，視線朝前方上看鏡頭，視若無睹感。相機高度放在妳的踏板。人物站中央或 1/3 位置，讓地標出現在身後對齊格線。',
- svg:`${head(46,38)}
-   <path d="M46 44 L46 78 M46 52 L36 60 M46 52 L56 58 M46 78 L38 102 M46 78 L56 100" ${stroke}/>
-   <line x1="72" y1="20" x2="72" y2="120" ${soft}/>${lbl(72,16,'地標在右線')}`},
+ svg:`${head(46,38)}<path d="M46 44 L46 78 M46 52 L36 60 M46 52 L56 58 M46 78 L38 102 M46 78 L56 100" ${stroke}/><line x1="72" y1="20" x2="72" y2="120" ${soft}/>${lbl(72,16,'地標在右線')}`},
 {cat:'city',name:'靠牆立姿',q:'靠牆 立姿 街拍 顯瘦',
  tip:'肩背靠牆到腳跟，重心放後腳，上臂肩膀平衡',
  howto:'肩背靠牆，一腳點到腳跟站起，重心往後移。上臂肩膀平衡身體拍出弧線，另一臂自然放。從斜側低角度拍時，正面笑一轉更長。',
- svg:`${head(40,38)}
-   <path d="M40 44 L40 80 M40 52 L30 60 M40 54 L52 58 M40 80 L34 104 M40 80 L50 92 L46 104" ${stroke}/>
-   <line x1="24" y1="14" x2="24" y2="126" ${stroke} opacity="0.5"/>${lbl(28,120,'牆面')}`},
+ svg:`${head(40,38)}<path d="M40 44 L40 80 M40 52 L30 60 M40 54 L52 58 M40 80 L34 104 M40 80 L50 92 L46 104" ${stroke}/><line x1="24" y1="14" x2="24" y2="126" ${stroke} opacity="0.5"/>${lbl(28,120,'牆面')}`},
 {cat:'city',name:'階梯坐姿',q:'階梯 坐姿 側翹 文青',
  tip:'坐階梯一腳到膝，相機放低往上拍顯近遠長',
  howto:'坐在階梯上，這腳和那腳膝蓋不同高，一腳往後稍微翹。上臂搭側，相機放在妳膝蓋高度往上拍，這部份比例拍更長有感。',
- svg:`${head(50,40)}
-   <path d="M50 46 L50 70 M50 54 L40 60 M50 56 L60 60 M50 70 L40 82 M50 70 L60 86" ${stroke}/>
-   <path d="M30 92 H50 V100 H70" ${soft}/>${lbl(50,116,'低角度往上')}`},
+ svg:`${head(50,40)}<path d="M50 46 L50 70 M50 54 L40 60 M50 56 L60 60 M50 70 L40 82 M50 70 L60 86" ${stroke}/><path d="M30 92 H50 V100 H70" ${soft}/>${lbl(50,116,'低角度往上')}`},
 {cat:'city',name:'抬頭仰望',q:'仰望 高樓 建築 人像',
  tip:'抬頭看高樓，廣角貼近，建築線條往上消失點',
  howto:'站在高樓或地標下方抬頭仰望，用廣角從低往後貼近往上拍。建築線條拍到往上消失點，讓妳顯得修長而張開。',
- svg:`${head(50,52,6.5)}
-   <path d="M50 59 L50 86 M50 66 L40 74 M50 66 L60 74" ${stroke}/>
-   <path d="M14 130 L42 30 M86 130 L58 30" ${soft}/>${lbl(50,118,'建築線往上消')}`},
+ svg:`${head(50,52,6.5)}<path d="M50 59 L50 86 M50 66 L40 74 M50 66 L60 74" ${stroke}/><path d="M14 130 L42 30 M86 130 L58 30" ${soft}/>${lbl(50,118,'建築線往上消')}`},
 ];
 
-/* ---------- State ---------- */
+/* -------- State -------- */
 let curCat='cafe', curPose=null, mirror=true, facing='user', stream=null, gridOn=false;
-let zoomLevel=1;
+let zoomLevel=1, torchOn=false, cameraDevices=[], curDeviceId=null;
 
-/* ---------- Build category tabs ---------- */
+/* -------- Pose UI -------- */
 const catsEl=A('#cats');
 CATS.forEach(c=>{
   const b=document.createElement('button');
@@ -391,13 +403,11 @@ CATS.forEach(c=>{
   b.onclick=()=>{curCat=c.id;document.querySelectorAll('.cat').forEach(x=>x.classList.toggle('on',x.dataset.id===c.id));buildPoses();};
   catsEl.appendChild(b);
 });
-
-/* ---------- Build pose strip ---------- */
 const posesEl=A('#poses');
 function buildPoses(){
   posesEl.innerHTML='';
   const list=POSES.filter(p=>p.cat===curCat);
-  list.forEach((p,i)=>{
+  list.forEach(p=>{
     const d=document.createElement('button');
     d.className='pose'; d.dataset.idx=POSES.indexOf(p);
     d.innerHTML=`<svg viewBox="0 0 100 140">${p.svg}</svg>`;
@@ -415,13 +425,12 @@ function selectPose(idx){
   document.querySelectorAll('.pose').forEach(x=>x.classList.toggle('on',+x.dataset.idx===idx));
 }
 
-/* ---------- Camera ---------- */
+/* -------- Camera core -------- */
 function updateVideoTransform(){
   const v=A('#video');
   const mx=(facing==='user'&&mirror)?-zoomLevel:zoomLevel;
   v.style.transform=`scaleX(${mx}) scaleY(${zoomLevel})`;
 }
-
 function tryNativeZoom(level){
   if(!stream)return;
   const track=stream.getVideoTracks()[0];
@@ -431,7 +440,6 @@ function tryNativeZoom(level){
     track.applyConstraints({advanced:[{zoom:z}]}).catch(()=>{});
   }
 }
-
 function setZoom(level){
   zoomLevel=Math.max(1,Math.min(5,level));
   A('#zoomSlider').value=zoomLevel;
@@ -439,24 +447,232 @@ function setZoom(level){
   updateVideoTransform();
   tryNativeZoom(zoomLevel);
 }
-
+async function enumCameras(){
+  try{
+    const devs=await navigator.mediaDevices.enumerateDevices();
+    cameraDevices=devs.filter(d=>d.kind==='videoinput');
+  }catch(e){}
+}
 async function startCam(){
   try{
     if(stream)stream.getTracks().forEach(t=>t.stop());
-    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing,width:{ideal:1080},height:{ideal:1920}},audio:false});
+    const vc=curDeviceId
+      ?{deviceId:{exact:curDeviceId},width:{ideal:1920},height:{ideal:1080}}
+      :{facingMode:facing,width:{ideal:1080},height:{ideal:1920}};
+    stream=await navigator.mediaDevices.getUserMedia({video:vc,audio:false});
     const v=A('#video'); v.srcObject=stream; A('#noCam').style.display='none';
     updateVideoTransform();
     tryNativeZoom(zoomLevel);
+    // Torch: reset + check support
+    torchOn=false; A('#torchBtn').classList.remove('on');
+    const caps=stream.getVideoTracks()[0].getCapabilities?.()??{};
+    A('#torchBtn').style.display=caps.torch?'flex':'none';
   }catch(e){ A('#noCam').style.display='flex'; }
 }
 
-A('#flipBtn').onclick=()=>{facing=facing==='user'?'environment':'user';setZoom(1);startCam();};
-A('#gridBtn').onclick=()=>{gridOn=!gridOn;A('#gridLines').classList.toggle('show',gridOn);A('#gridBtn').style.color=gridOn?'var(--blush)':'#fff';};
-A('#randomBtn').onclick=()=>{const list=POSES.filter(p=>p.cat===curCat);selectPose(POSES.indexOf(list[Math.floor(Math.random()*list.length)]));};
-A('#retry').onclick=startCam;
-A('#zoomSlider').oninput=()=>setZoom(+A('#zoomSlider').value);
+/* -------- Torch -------- */
+function applyAdvanced(obj){
+  if(!stream)return;
+  stream.getVideoTracks()[0].applyConstraints({advanced:[obj]}).catch(()=>{});
+}
+function setTorch(on){ torchOn=on; A('#torchBtn').classList.toggle('on',on); applyAdvanced({torch:on}); }
+A('#torchBtn').onclick=()=>setTorch(!torchOn);
 
-/* ---------- Pinch to zoom ---------- */
+/* -------- Tap-to-focus -------- */
+A('#video').addEventListener('click',async e=>{
+  if(!stream)return;
+  const ring=A('#focusRing');
+  ring.style.left=e.clientX+'px'; ring.style.top=e.clientY+'px';
+  ring.classList.add('active');
+  setTimeout(()=>ring.classList.remove('active'),700);
+  const track=stream.getVideoTracks()[0];
+  const caps=track.getCapabilities?.()??{};
+  if(caps.focusMode?.includes('single-shot')){
+    const r=A('#video').getBoundingClientRect();
+    const x=(e.clientX-r.left)/r.width, y=(e.clientY-r.top)/r.height;
+    track.applyConstraints({advanced:[{focusMode:'single-shot',pointsOfInterest:[{x,y}]}]}).catch(()=>{});
+  }
+  if(caps.exposureMode?.includes('single-shot')){
+    const r=A('#video').getBoundingClientRect();
+    const x=(e.clientX-r.left)/r.width, y=(e.clientY-r.top)/r.height;
+    track.applyConstraints({advanced:[{exposureMode:'single-shot',pointsOfInterest:[{x,y}]}]}).catch(()=>{});
+  }
+});
+
+/* -------- Camera settings panel -------- */
+function buildCamPanel(){
+  if(!stream){A('#cpBody').innerHTML='<p class="cpEmpty">請先開啟相機</p>';return;}
+  const track=stream.getVideoTracks()[0];
+  const caps=track.getCapabilities?.()??{};
+  const settings=track.getSettings?.()??{};
+  let html='';
+
+  // Camera selector
+  if(cameraDevices.length>1){
+    html+=`<div class="cpSec"><div class="cpTitle">選擇鏡頭</div><div class="cpRow">
+      <select class="cpSel" id="camDevSel">`;
+    cameraDevices.forEach((d,i)=>{
+      const sel=d.deviceId===(curDeviceId||settings.deviceId)?'selected':'';
+      html+=`<option value="${d.deviceId}" ${sel}>${d.label||'鏡頭 '+(i+1)}</option>`;
+    });
+    html+=`</select></div></div>`;
+  }
+
+  // Focus
+  if(caps.focusMode){
+    const fmL={auto:'自動',manual:'手動',continuous:'連續追焦','single-shot':'單次'};
+    html+=`<div class="cpSec"><div class="cpTitle">對焦</div>
+      <div class="cpRow"><span class="cpLab">模式</span>
+      <div class="cpTog" id="focusTog">`;
+    caps.focusMode.forEach(m=>{
+      const on=m===(settings.focusMode??'continuous')?'on':'';
+      html+=`<button class="${on}" data-v="${m}">${fmL[m]??m}</button>`;
+    });
+    html+=`</div></div>`;
+    if(caps.focusDistance){
+      const {min,max,step}=caps.focusDistance;
+      html+=`<div class="cpRow"><span class="cpLab">對焦距離</span>
+        <input type="range" class="cpRange" data-key="focusDistance" data-adv="1" min="${min}" max="${max}" step="${step??0.01}" value="${settings.focusDistance??min}">
+        <span class="cpVal">${(settings.focusDistance??min).toFixed(2)}</span></div>`;
+    }
+    html+=`<p class="cpNote">點擊畫面可點選對焦位置</p></div>`;
+  }
+
+  // Exposure
+  const hasExp=caps.exposureMode||caps.exposureCompensation||caps.exposureTime||caps.iso;
+  if(hasExp){
+    html+=`<div class="cpSec"><div class="cpTitle">曝光</div>`;
+    if(caps.exposureMode){
+      const emL={auto:'自動',manual:'手動',continuous:'連續','single-shot':'單次'};
+      html+=`<div class="cpRow"><span class="cpLab">模式</span>
+        <div class="cpTog" id="expTog">`;
+      caps.exposureMode.forEach(m=>{
+        const on=m===(settings.exposureMode??'continuous')?'on':'';
+        html+=`<button class="${on}" data-v="${m}">${emL[m]??m}</button>`;
+      });
+      html+=`</div></div>`;
+    }
+    if(caps.exposureCompensation){
+      const {min,max,step}=caps.exposureCompensation;
+      const cur=settings.exposureCompensation??0;
+      html+=`<div class="cpRow"><span class="cpLab">曝光補償</span>
+        <input type="range" class="cpRange" data-key="exposureCompensation" data-adv="1" min="${min}" max="${max}" step="${step??0.1}" value="${cur}">
+        <span class="cpVal">${cur>0?'+'+cur:cur} EV</span></div>`;
+    }
+    if(caps.iso){
+      const {min,max,step}=caps.iso;
+      html+=`<div class="cpRow"><span class="cpLab">ISO</span>
+        <input type="range" class="cpRange" data-key="iso" data-adv="1" min="${min}" max="${max}" step="${step??1}" value="${settings.iso??min}">
+        <span class="cpVal">${settings.iso??min}</span></div>`;
+    }
+    if(caps.exposureTime){
+      const {min,max}=caps.exposureTime;
+      html+=`<div class="cpRow"><span class="cpLab">快門速度</span>
+        <input type="range" class="cpRange" data-key="exposureTime" data-adv="1" min="${min}" max="${max}" step="${Math.round((max-min)/100)}" value="${settings.exposureTime??min}">
+        <span class="cpVal" id="evVal">1/${Math.round(1e6/(settings.exposureTime??min))}s</span></div>`;
+    }
+    html+=`</div>`;
+  }
+
+  // White balance
+  if(caps.whiteBalanceMode||caps.colorTemperature){
+    html+=`<div class="cpSec"><div class="cpTitle">白平衡</div>`;
+    if(caps.whiteBalanceMode){
+      const wbL={auto:'自動',manual:'手動',continuous:'連續','single-shot':'單次'};
+      html+=`<div class="cpRow"><span class="cpLab">模式</span>
+        <div class="cpTog" id="wbTog">`;
+      caps.whiteBalanceMode.forEach(m=>{
+        const on=m===(settings.whiteBalanceMode??'continuous')?'on':'';
+        html+=`<button class="${on}" data-v="${m}">${wbL[m]??m}</button>`;
+      });
+      html+=`</div></div>`;
+    }
+    if(caps.colorTemperature){
+      const {min,max,step}=caps.colorTemperature;
+      html+=`<div class="cpRow"><span class="cpLab">色溫</span>
+        <input type="range" class="cpRange" data-key="colorTemperature" data-adv="1" min="${min}" max="${max}" step="${step??10}" value="${settings.colorTemperature??min}">
+        <span class="cpVal">${settings.colorTemperature??min}K</span></div>`;
+    }
+    html+=`</div>`;
+  }
+
+  // Image adjustments
+  const adj=[
+    {key:'brightness',label:'亮度'},
+    {key:'contrast',label:'對比'},
+    {key:'saturation',label:'飽和度'},
+    {key:'sharpness',label:'銳利度'},
+  ].filter(a=>caps[a.key]);
+  if(adj.length){
+    html+=`<div class="cpSec"><div class="cpTitle">畫面調整</div>`;
+    adj.forEach(a=>{
+      const {min,max,step}=caps[a.key];
+      const cur=settings[a.key]!==undefined?settings[a.key]:Math.round((min+max)/2);
+      html+=`<div class="cpRow"><span class="cpLab">${a.label}</span>
+        <input type="range" class="cpRange" data-key="${a.key}" data-adv="1" min="${min}" max="${max}" step="${step??1}" value="${cur}">
+        <span class="cpVal">${cur}</span></div>`;
+    });
+    html+=`</div>`;
+  }
+
+  // Pan / Tilt
+  if(caps.pan||caps.tilt){
+    html+=`<div class="cpSec"><div class="cpTitle">雲台</div>`;
+    if(caps.pan){
+      const {min,max,step}=caps.pan;
+      html+=`<div class="cpRow"><span class="cpLab">水平（Pan）</span>
+        <input type="range" class="cpRange" data-key="pan" data-adv="1" min="${min}" max="${max}" step="${step??1}" value="${settings.pan??0}">
+        <span class="cpVal">${settings.pan??0}°</span></div>`;
+    }
+    if(caps.tilt){
+      const {min,max,step}=caps.tilt;
+      html+=`<div class="cpRow"><span class="cpLab">垂直（Tilt）</span>
+        <input type="range" class="cpRange" data-key="tilt" data-adv="1" min="${min}" max="${max}" step="${step??1}" value="${settings.tilt??0}">
+        <span class="cpVal">${settings.tilt??0}°</span></div>`;
+    }
+    html+=`</div>`;
+  }
+
+  if(!html) html='<p class="cpEmpty">此裝置不支援進階相機設定</p>';
+  A('#cpBody').innerHTML=html;
+
+  // Wire events
+  if(A('#camDevSel')) A('#camDevSel').onchange=e=>{curDeviceId=e.target.value;setZoom(1);startCam();A('#camPanel').classList.remove('open');};
+
+  // Toggle groups
+  [['#focusTog','focusMode'],['#expTog','exposureMode'],['#wbTog','whiteBalanceMode']].forEach(([sel,key])=>{
+    const g=A(sel); if(!g)return;
+    g.querySelectorAll('button').forEach(btn=>{
+      btn.onclick=()=>{
+        g.querySelectorAll('button').forEach(b=>b.classList.remove('on'));
+        btn.classList.add('on');
+        applyAdvanced({[key]:btn.dataset.v});
+      };
+    });
+  });
+
+  // Range sliders
+  A('#cpBody').querySelectorAll('.cpRange').forEach(el=>{
+    el.oninput=()=>{
+      const key=el.dataset.key, val=parseFloat(el.value);
+      const valEl=el.nextElementSibling;
+      if(key==='colorTemperature') valEl.textContent=val+'K';
+      else if(key==='exposureTime') valEl.textContent='1/'+Math.round(1e6/val)+'s';
+      else if(key==='exposureCompensation') valEl.textContent=(val>0?'+':'')+val.toFixed(1)+' EV';
+      else if(key==='focusDistance') valEl.textContent=val.toFixed(2);
+      else if(key==='pan'||key==='tilt') valEl.textContent=val+'°';
+      else valEl.textContent=Math.round(val);
+      if(el.dataset.adv) applyAdvanced({[key]:val});
+    };
+  });
+}
+
+A('#camSettingsBtn').onclick=()=>{buildCamPanel();A('#camPanel').classList.add('open');};
+A('#camClose').onclick=()=>A('#camPanel').classList.remove('open');
+A('#camPanelBg').onclick=()=>A('#camPanel').classList.remove('open');
+
+/* -------- Zoom controls -------- */
+A('#zoomSlider').oninput=()=>setZoom(+A('#zoomSlider').value);
 let pinchDist0=null;
 A('#stage').addEventListener('touchstart',e=>{
   if(e.touches.length===2)
@@ -465,13 +681,18 @@ A('#stage').addEventListener('touchstart',e=>{
 A('#stage').addEventListener('touchmove',e=>{
   if(e.touches.length===2&&pinchDist0){
     const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
-    setZoom(zoomLevel*(d/pinchDist0));
-    pinchDist0=d;
+    setZoom(zoomLevel*(d/pinchDist0)); pinchDist0=d;
   }
 },{passive:true});
 A('#stage').addEventListener('touchend',e=>{if(e.touches.length<2)pinchDist0=null;},{passive:true});
 
-/* ---------- Reference example sheet ---------- */
+/* -------- Other buttons -------- */
+A('#flipBtn').onclick=()=>{curDeviceId=null;facing=facing==='user'?'environment':'user';setZoom(1);startCam();};
+A('#gridBtn').onclick=()=>{gridOn=!gridOn;A('#gridLines').classList.toggle('show',gridOn);A('#gridBtn').classList.toggle('on',gridOn);};
+A('#randomBtn').onclick=()=>{const list=POSES.filter(p=>p.cat===curCat);selectPose(POSES.indexOf(list[Math.floor(Math.random()*list.length)]));};
+A('#retry').onclick=startCam;
+
+/* -------- Reference example sheet -------- */
 A('#refBtn').onclick=()=>{
   const p=POSES[curPose];
   const gUrl='https://www.google.com/search?tbm=isch&q='+encodeURIComponent(p.q);
@@ -479,83 +700,66 @@ A('#refBtn').onclick=()=>{
   const pUrl='https://www.pinterest.com/search/pins/?q='+encodeURIComponent(p.q);
   A('#refSub').textContent=p.name+' · '+p.q;
   A('#refBody').innerHTML=`
-    <div class="refCard">
-      <h4>怎麼擺這個姿勢</h4>
-      <p>${p.howto}</p>
-    </div>
-    <div class="refCard">
-      <h4>看真實範例照</h4>
-      <p>下面三個來源都是真實網美照，點進去更多可以跟著模仿。對好姿勢角度再回相機對齊引導線。</p>
+    <div class="refCard"><h4>怎麼擺這個姿勢</h4><p>${p.howto}</p></div>
+    <div class="refCard"><h4>看真實範例照</h4>
+      <p>下面三個來源都是真實網美照，點進去更多可以跟著模仿。</p>
       <a href="${gUrl}" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>Google 圖搜</a>
       <a href="${xUrl}" target="_blank" rel="noopener" style="background:#fff;color:#ff2442">小紅書</a>
       <a href="${pUrl}" target="_blank" rel="noopener" style="background:#fff;color:#e60023">Pinterest</a>
     </div>
-    <div class="refCard">
-      <h4>把參考圖可疊入畫面</h4>
-      <p>在下面平台找到一張欣賞的照片，再點裡面選那張上傳，它就會貼在相機畫面上，讓你對著姿勢對角度拍。</p>
-      <a href="#" id="importBtn" style="background:var(--sage);color:#fff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>選擇參考圖可疊入</a>
+    <div class="refCard"><h4>把參考圖疊入畫面</h4>
+      <p>找到一張欣賞的照片後，選擇上傳，它就會貼在相機畫面上讓你對照姿勢。</p>
+      <a href="#" id="importBtn" style="background:var(--sage);color:#fff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>選擇參考圖疊入</a>
     </div>
-    <p class="refNote">範例照來自第三方平台，原來姿勢參考；著作權屬各作者。請勿直接複製他人照片。</p>`;
+    <p class="refNote">範例照來自第三方平台，著作權屬各作者，請勿直接複製。</p>`;
   A('#refSheet').style.display='flex';
-  A('#importBtn').onclick=(e)=>{e.preventDefault();A('#importInput').click();};
+  A('#importBtn').onclick=e=>{e.preventDefault();A('#importInput').click();};
 };
 A('#refClose').onclick=()=>A('#refSheet').style.display='none';
 
-/* ---------- Imported reference image overlay ---------- */
+/* -------- Imported reference image -------- */
 let refMode='full';
-A('#importInput').onchange=(e)=>{
-  const f=e.target.files[0];if(!f)return;
-  const url=URL.createObjectURL(f);
+A('#importInput').onchange=e=>{
+  const f=e.target.files[0]; if(!f)return;
   const img=A('#refImg');
-  img.src=url;
-  img.style.display='block';
-  setRefMode(refMode);
-  applyOpacity();
-  A('#refCtrl').style.display='block';
-  A('#refSheet').style.display='none';
+  img.src=URL.createObjectURL(f); img.style.display='block';
+  setRefMode(refMode); applyOpacity();
+  A('#refCtrl').style.display='block'; A('#refSheet').style.display='none';
   e.target.value='';
 };
 function setRefMode(m){
-  refMode=m;
-  const img=A('#refImg');
+  refMode=m; const img=A('#refImg');
   img.className=(m==='full')?'full':'corner tl';
   A('#mFull').classList.toggle('on',m==='full');
   A('#mCorner').classList.toggle('on',m==='corner');
   A('#opSlider').parentElement.style.opacity=(m==='corner')?'.4':'1';
 }
-function applyOpacity(){
-  A('#refImg').style.opacity=(A('#opSlider').value/100).toFixed(2);
-}
+function applyOpacity(){ A('#refImg').style.opacity=(A('#opSlider').value/100).toFixed(2); }
 A('#mFull').onclick=()=>{setRefMode('full');applyOpacity();};
 A('#mCorner').onclick=()=>{setRefMode('corner');A('#refImg').style.opacity='1';};
 A('#opSlider').oninput=()=>{if(refMode==='full')applyOpacity();};
-A('#clearRef').onclick=()=>{
-  A('#refImg').style.display='none';A('#refImg').src='';
-  A('#refCtrl').style.display='none';
-};
+A('#clearRef').onclick=()=>{A('#refImg').style.display='none';A('#refImg').src='';A('#refCtrl').style.display='none';};
 
-/* ---------- Shutter ---------- */
+/* -------- Shutter -------- */
 A('#shutter').onclick=()=>{
-  const v=A('#video');
-  if(!v.videoWidth){flash();return;}
+  const v=A('#video'); if(!v.videoWidth){flash();return;}
   flash();
   const c=A('#canvas'),x=c.getContext('2d');
-  c.width=v.videoWidth;c.height=v.videoHeight;
+  c.width=v.videoWidth; c.height=v.videoHeight;
   if(facing==='user'&&mirror){x.translate(c.width,0);x.scale(-1,1);}
   x.drawImage(v,0,0,c.width,c.height);
   A('#shotImg').src=c.toDataURL('image/jpeg',0.95);
   A('#shot').style.display='flex';
 };
-function flash(){const f=A('#flash');f.style.transition='none';f.style.opacity='.9';
-  requestAnimationFrame(()=>{f.style.transition='opacity .4s';f.style.opacity='0';});}
-
+function flash(){const f=A('#flash');f.style.transition='none';f.style.opacity='.9';requestAnimationFrame(()=>{f.style.transition='opacity .4s';f.style.opacity='0';});}
 A('#retake').onclick=()=>A('#shot').style.display='none';
 A('#save').onclick=()=>{const a=document.createElement('a');a.href=A('#shotImg').src;a.download='pose-'+Date.now()+'.jpg';a.click();};
 
-/* ---------- Intro ---------- */
+/* -------- Intro -------- */
 A('#start').onclick=async()=>{
-  const intro=A('#intro');intro.style.opacity='0';
+  const intro=A('#intro'); intro.style.opacity='0';
   setTimeout(()=>intro.style.display='none',500);
+  await enumCameras();
   await startCam();
 };
 
