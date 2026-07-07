@@ -324,7 +324,7 @@
 <div id="focusRing"></div>
 
 <div id="topbar">
-  <div class="brand">POSE<b>·</b>STUDIO <span class="ver">v2.7</span></div>
+  <div class="brand">POSE<b>·</b>STUDIO <span class="ver">v2.8</span></div>
   <div class="topbtns">
     <button class="iconbtn" id="torchBtn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
@@ -1409,6 +1409,43 @@ buildPoses();
 /* PWA: offline shell + installability (https only, so local dev stays uncached) */
 if('serviceWorker' in navigator && location.protocol==='https:')
   navigator.serviceWorker.register('sw.js').catch(()=>{});
+
+/* -------- Self-updating: detect a newer deployed version and offer 1-tap update.
+   Stale caches (Safari HTTP cache + PWA cache) kept serving old builds; this
+   checks the server directly, bypassing every cache layer. -------- */
+const APP_VER='2.8';
+async function checkUpdate(){
+  if(location.protocol!=='https:')return;
+  try{
+    const r=await fetch('version.json?ts='+Date.now(),{cache:'no-store'});
+    const j=await r.json();
+    if(j.v&&j.v!==APP_VER){
+      const b=document.createElement('button');
+      b.textContent='⬆ 發現新版本 v'+j.v+'，點此立即更新';
+      b.style.cssText='position:fixed;left:50%;transform:translateX(-50%);'+
+        'top:calc(env(safe-area-inset-top) + 160px);z-index:60;padding:12px 22px;'+
+        'border-radius:30px;border:1px solid #5fe08d;background:#0d2c1bee;color:#5fe08d;'+
+        'font-size:13px;letter-spacing:.06em;font-weight:600';
+      b.onclick=async()=>{
+        b.textContent='更新中…';
+        try{
+          if('serviceWorker' in navigator){
+            const regs=await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map(x=>x.unregister()));
+          }
+          if(window.caches){
+            const ks=await caches.keys();
+            await Promise.all(ks.map(k=>caches.delete(k)));
+          }
+        }catch(e){}
+        location.replace(location.pathname+'?u='+Date.now());
+      };
+      document.body.appendChild(b);
+    }
+  }catch(e){}
+}
+checkUpdate();
+setInterval(checkUpdate,60000);
 </script>
 </body>
 </html>

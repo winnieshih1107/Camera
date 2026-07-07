@@ -1,6 +1,7 @@
-// Pose Studio service worker — network-first with runtime cache fallback,
-// so the shell keeps working offline but updates flow through immediately.
-const CACHE = 'pose-studio-v2';
+// Pose Studio service worker — network-first. Same-origin requests bypass the
+// HTTP cache entirely (stale Safari caches kept serving old builds); the CDN
+// AI model stays normally cached because it is large and versioned.
+const CACHE = 'pose-studio-v3';
 self.addEventListener('install', e => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(
   caches.keys()
@@ -8,12 +9,14 @@ self.addEventListener('activate', e => e.waitUntil(
     .then(() => self.clients.claim())
 ));
 self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
+  const req = e.request;
+  if (req.method !== 'GET') return;
+  const sameOrigin = new URL(req.url).origin === self.location.origin;
   e.respondWith(
-    fetch(e.request).then(r => {
+    fetch(req, sameOrigin ? { cache: 'no-store' } : undefined).then(r => {
       const copy = r.clone();
-      caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
+      caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
       return r;
-    }).catch(() => caches.match(e.request))
+    }).catch(() => caches.match(req))
   );
 });
