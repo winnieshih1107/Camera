@@ -324,7 +324,7 @@
 <div id="focusRing"></div>
 
 <div id="topbar">
-  <div class="brand">POSE<b>·</b>STUDIO <span class="ver">v2.9</span></div>
+  <div class="brand">POSE<b>·</b>STUDIO <span class="ver">v3.0</span></div>
   <div class="topbtns">
     <button class="iconbtn" id="torchBtn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
@@ -1413,13 +1413,15 @@ if('serviceWorker' in navigator && location.protocol==='https:')
 /* -------- Self-updating: detect a newer deployed version and offer 1-tap update.
    Stale caches (Safari HTTP cache + PWA cache) kept serving old builds; this
    checks the server directly, bypassing every cache layer. -------- */
-const APP_VER='2.9';
+const APP_VER='3.0';
+let updBtnShown=false;
 async function checkUpdate(){
-  if(location.protocol!=='https:')return;
+  if(location.protocol!=='https:'||updBtnShown)return;
   try{
     const r=await fetch('version.json?ts='+Date.now(),{cache:'no-store'});
     const j=await r.json();
     if(j.v&&j.v!==APP_VER){
+      updBtnShown=true;
       const b=document.createElement('button');
       b.textContent='⬆ 發現新版本 v'+j.v+'，點此立即更新';
       b.style.cssText='position:fixed;left:50%;transform:translateX(-50%);'+
@@ -1446,6 +1448,9 @@ async function checkUpdate(){
 }
 checkUpdate();
 setInterval(checkUpdate,60000);
+// iOS keeps tabs alive for days — re-check the moment the tab comes back
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdate();});
+window.addEventListener('pageshow',e=>{if(e.persisted)checkUpdate();});
 
 /* -------- Install-as-App guidance --------
    Shows once (dismissible) when running in a normal browser tab.
