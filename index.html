@@ -123,6 +123,10 @@
   #zoomSlider{width:150px;transform:rotate(-90deg);accent-color:var(--blush);
     position:absolute;cursor:pointer;height:30px}
   #zoomLabel{font-size:10px;letter-spacing:.04em;opacity:.8;color:var(--blush)}
+  .zbtn{width:32px;height:32px;border-radius:50%;border:1px solid #fff3;
+    background:#fff1;color:#fff;font-size:17px;line-height:1;
+    display:flex;align-items:center;justify-content:center}
+  .zbtn:active{background:var(--blush);color:var(--ink)}
 
   /* Tap-to-focus ring */
   #focusRing{position:fixed;z-index:7;width:56px;height:56px;border-radius:50%;
@@ -295,10 +299,12 @@
   <div id="skelLayer"><svg id="skelSvg"></svg></div>
 
   <div id="zoomCtrl">
+    <button class="zbtn" id="zoomIn">＋</button>
     <div id="zoomTrack">
       <input type="range" id="zoomSlider" min="0.5" max="5" value="1" step="0.1">
     </div>
     <span id="zoomLabel">1×</span>
+    <button class="zbtn" id="zoomOut">−</button>
   </div>
   <div id="noCam">
     <h2>需要相機權限</h2>
@@ -595,6 +601,7 @@ function buildPoses(){
 function selectPose(idx){
   curPose=idx;
   const p=POSES[idx];
+  A('#guideLayer').style.display=''; // picking a pose brings the guide back
   A('#guideLayer').innerHTML=p.svg;
   A('#poseLabel').textContent=p.name;
   A('#poseTip').textContent=p.tip;
@@ -619,21 +626,29 @@ function updateVideoTransform(){
   const mx=(facing==='user'&&mirror)?-cz:cz;
   v.style.transform=`scaleX(${mx}) scaleY(${cz})`;
 }
-function setZoom(level){
+async function setZoom(level){
   zoomLevel=Math.max(0.5,Math.min(5,level));
-  const nz=nativeZoomCaps();
-  if(nz){
-    const z=Math.max(nz.min,Math.min(nz.max,zoomLevel));
-    stream.getVideoTracks()[0].applyConstraints({advanced:[{zoom:z}]}).catch(()=>{});
-    appliedNativeZoom=z;
-  }else{
-    appliedNativeZoom=1;
-  }
   A('#zoomSlider').value=zoomLevel;
   A('#zoomLabel').textContent=zoomLevel.toFixed(1)+'×';
-  updateVideoTransform();
+  appliedNativeZoom=1;
+  updateVideoTransform(); // CSS zoom takes effect immediately…
+  const nz=nativeZoomCaps();
+  if(nz&&stream){
+    const track=stream.getVideoTracks()[0];
+    const z=Math.max(nz.min,Math.min(nz.max,zoomLevel));
+    try{
+      await track.applyConstraints({advanced:[{zoom:z}]});
+      // …then trust only what the hardware ACTUALLY applied — many phones
+      // advertise zoom caps but silently ignore the constraint
+      const got=track.getSettings?.().zoom;
+      appliedNativeZoom=(got&&Math.abs(got-z)<0.05)?got:1;
+    }catch(e){ appliedNativeZoom=1; }
+    updateVideoTransform();
+  }
 }
 A('#zoomLabel').onclick=()=>setZoom(1); // tap the ×-label to reset
+A('#zoomIn').onclick=()=>setZoom(zoomLevel+0.25);
+A('#zoomOut').onclick=()=>setZoom(zoomLevel-0.25);
 async function enumCameras(){
   try{
     const devs=await navigator.mediaDevices.enumerateDevices();
@@ -902,11 +917,15 @@ async function ensureLandmarker(){
     const fileset=await mod.FilesetResolver.forVisionTasks(CDN+'/wasm');
     landmarker=await mod.PoseLandmarker.createFromOptions(fileset,{
       baseOptions:{
-        modelAssetPath:'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
+        // full model: noticeably better on stylized / illustrated subjects than lite
+        modelAssetPath:'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task',
         delegate:'GPU'
       },
       runningMode:'VIDEO',
-      numPoses:1
+      numPoses:1,
+      minPoseDetectionConfidence:0.3,
+      minPosePresenceConfidence:0.3,
+      minTrackingConfidence:0.3
     });
     return landmarker;
   })();
@@ -920,7 +939,7 @@ async function ensureLandmarker(){
 
 /* Normalize pose for similarity comparison: center at mid-hip,
    scale by torso length, in isotropic (pixel-ratio) units */
-const VIS=0.5; // landmarks below this visibility are off-frame guesses — ignore them
+const VIS=0.4; // landmarks below this visibility are off-frame guesses — ignore them
 function normPose(lm,w,h){
   const px=i=>({x:lm[i].x*w,y:lm[i].y*h,v:lm[i].visibility??1});
   const lh=px(23),rh=px(24),ls=px(11),rs=px(12);
@@ -1068,10 +1087,11 @@ A('#importInput').onchange=e=>{
         tf.skel={x:0,y:0,s:1,r:0}; applyTf('skel');
         drawRefSkeleton();
         gestureTarget='skel'; syncTgtButtons();
+        A('#guideLayer').style.display='none'; // AI skeleton replaces the built-in guide
         toast('AI 已擷取姿勢骨架，可拖曳／縮放對齊',true);
       }else{
         refLm=null;refNorm=null;A('#skelLayer').style.display='none';
-        toast('照片中未偵測到人物姿勢');
+        toast('照片中未偵測到人物姿勢（插畫／動漫圖較難辨識，建議用真人照片）');
       }
     }catch(err){ /* model load failed — manual overlay still works */ }
   };
@@ -1097,6 +1117,7 @@ A('#clearRef').onclick=()=>{
   A('#skelLayer').style.display='none';A('#skelSvg').innerHTML='';
   A('#horizonSvg').innerHTML='';
   A('#refCtrl').style.display='none';
+  A('#guideLayer').style.display='';
   refLm=null;refNorm=null;refDims=null;lastHorizons=[];
   stopLive();
 };
