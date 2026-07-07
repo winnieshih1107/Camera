@@ -609,42 +609,23 @@ function selectPose(idx){
 }
 
 /* -------- Camera core --------
-   Zoom strategy: prefer the device's optical/native zoom; only the part the
-   hardware can't cover is done with CSS scaling. Never both at full strength
-   (that used to multiply into a huge zoom). Range 0.5×–5×; below the
-   hardware minimum the preview shrinks with letterboxing. */
-let appliedNativeZoom=1;
-function nativeZoomCaps(){
-  if(!stream) return null;
-  const caps=stream.getVideoTracks()[0].getCapabilities?.();
-  return (caps&&caps.zoom)?caps.zoom:null;
-}
-function cssZoom(){ return zoomLevel/appliedNativeZoom; }
+   Zoom is pure digital (CSS) zoom. Hardware zoom constraints are unreliable:
+   several phones (iPhone included) accept the constraint and even echo it in
+   getSettings() while the actual frame never changes. CSS scaling behaves
+   identically everywhere, and the shutter crops the same region so the photo
+   matches the preview. 0.5× only shrinks the preview as a framing aid. */
+function cssZoom(){ return zoomLevel; }
 function updateVideoTransform(){
   const v=A('#video');
   const cz=cssZoom();
   const mx=(facing==='user'&&mirror)?-cz:cz;
   v.style.transform=`scaleX(${mx}) scaleY(${cz})`;
 }
-async function setZoom(level){
+function setZoom(level){
   zoomLevel=Math.max(0.5,Math.min(5,level));
   A('#zoomSlider').value=zoomLevel;
   A('#zoomLabel').textContent=zoomLevel.toFixed(1)+'×';
-  appliedNativeZoom=1;
-  updateVideoTransform(); // CSS zoom takes effect immediately…
-  const nz=nativeZoomCaps();
-  if(nz&&stream){
-    const track=stream.getVideoTracks()[0];
-    const z=Math.max(nz.min,Math.min(nz.max,zoomLevel));
-    try{
-      await track.applyConstraints({advanced:[{zoom:z}]});
-      // …then trust only what the hardware ACTUALLY applied — many phones
-      // advertise zoom caps but silently ignore the constraint
-      const got=track.getSettings?.().zoom;
-      appliedNativeZoom=(got&&Math.abs(got-z)<0.05)?got:1;
-    }catch(e){ appliedNativeZoom=1; }
-    updateVideoTransform();
-  }
+  updateVideoTransform();
 }
 A('#zoomLabel').onclick=()=>setZoom(1); // tap the ×-label to reset
 A('#zoomIn').onclick=()=>setZoom(zoomLevel+0.25);
@@ -1353,9 +1334,14 @@ A('#shutter').onclick=()=>{
   const v=A('#video'); if(!v.videoWidth){flash();return;}
   flash();
   const c=A('#canvas'),x=c.getContext('2d');
-  c.width=v.videoWidth; c.height=v.videoHeight;
-  if(facing==='user'&&mirror){x.translate(c.width,0);x.scale(-1,1);}
-  x.drawImage(v,0,0,c.width,c.height);
+  // crop to the zoomed region so the photo matches the preview
+  // (zoom-out below 1× is only a framing aid — capture stays full frame)
+  const zi=Math.max(1,zoomLevel);
+  const sw=Math.round(v.videoWidth/zi), sh=Math.round(v.videoHeight/zi);
+  const sx=Math.round((v.videoWidth-sw)/2), sy=Math.round((v.videoHeight-sh)/2);
+  c.width=sw; c.height=sh;
+  if(facing==='user'&&mirror){x.translate(sw,0);x.scale(-1,1);}
+  x.drawImage(v,sx,sy,sw,sh,0,0,sw,sh);
   A('#shotImg').src=c.toDataURL('image/jpeg',0.95);
   A('#shot').style.display='flex';
 };
