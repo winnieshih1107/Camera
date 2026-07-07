@@ -128,6 +128,12 @@
     background:#fff1;color:#fff;font-size:17px;line-height:1;
     display:flex;align-items:center;justify-content:center}
   .zbtn:active{background:var(--blush);color:var(--ink)}
+  /* physical lens switcher (real optical FOV change) */
+  #lensRow{display:none;flex-direction:column;gap:6px;margin-bottom:6px;
+    padding-bottom:8px;border-bottom:1px solid #fff2}
+  #lensRow button{width:32px;height:32px;border-radius:50%;border:1px solid var(--gold);
+    background:#fff1;color:var(--gold);font-size:10px;font-weight:600}
+  #lensRow button.on{background:var(--gold);color:var(--ink)}
 
   /* Tap-to-focus ring */
   #focusRing{position:fixed;z-index:7;width:56px;height:56px;border-radius:50%;
@@ -300,6 +306,7 @@
   <div id="skelLayer"><svg id="skelSvg"></svg></div>
 
   <div id="zoomCtrl">
+    <div id="lensRow"></div>
     <button class="zbtn" id="zoomIn">＋</button>
     <div id="zoomTrack">
       <input type="range" id="zoomSlider" min="0.5" max="5" value="1" step="0.1">
@@ -317,7 +324,7 @@
 <div id="focusRing"></div>
 
 <div id="topbar">
-  <div class="brand">POSE<b>·</b>STUDIO <span class="ver">v2.6</span></div>
+  <div class="brand">POSE<b>·</b>STUDIO <span class="ver">v2.7</span></div>
   <div class="topbtns">
     <button class="iconbtn" id="torchBtn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
@@ -695,7 +702,38 @@ async function startCam(){
   const caps=stream.getVideoTracks()[0].getCapabilities?.()??{};
   A('#torchBtn').style.display=caps.torch?'flex':'none';
   // labels only appear after permission granted → refresh device list
-  enumCameras();
+  await enumCameras();
+  buildLensChips();
+}
+
+/* -------- Physical lens switcher (ultra-wide / wide / telephoto) --------
+   The only REAL optical near/far a web page can get: switching between the
+   phone's physical rear lenses. Digital zoom fills the gaps in between. */
+function lensLabel(label){
+  if(/ultra|超廣角|超广角/i.test(label)) return '.5×';
+  if(/tele|長焦|长焦|望遠|望远|telephoto/i.test(label)) return '3×';
+  return '1×';
+}
+function buildLensChips(){
+  const row=A('#lensRow');
+  row.innerHTML='';
+  const backs=cameraDevices.filter(d=>/back|rear|後置|后置/i.test(d.label||''));
+  const curId=curDeviceId||stream?.getVideoTracks()[0].getSettings?.().deviceId;
+  const onBack=facing==='environment'||backs.some(d=>d.deviceId===curId);
+  if(!onBack||backs.length<2){row.style.display='none';return;}
+  const order=l=>l==='.5×'?0:l==='1×'?1:2;
+  const seen=new Set();
+  backs.map(d=>({d,l:lensLabel(d.label)}))
+    .sort((a,b)=>order(a.l)-order(b.l))
+    .forEach(({d,l})=>{
+      if(seen.has(l))return; seen.add(l);
+      const b=document.createElement('button');
+      b.textContent=l;
+      if(d.deviceId===curId)b.classList.add('on');
+      b.onclick=()=>{curDeviceId=d.deviceId;setZoom(1);startCam();};
+      row.appendChild(b);
+    });
+  row.style.display=seen.size>=2?'flex':'none';
 }
 
 /* -------- Torch -------- */
