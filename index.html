@@ -324,7 +324,7 @@
 <div id="focusRing"></div>
 
 <div id="topbar">
-  <div class="brand">POSE<b>·</b>STUDIO <span class="ver">v2.8</span></div>
+  <div class="brand">POSE<b>·</b>STUDIO <span class="ver">v2.9</span></div>
   <div class="topbtns">
     <button class="iconbtn" id="torchBtn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
@@ -1413,7 +1413,7 @@ if('serviceWorker' in navigator && location.protocol==='https:')
 /* -------- Self-updating: detect a newer deployed version and offer 1-tap update.
    Stale caches (Safari HTTP cache + PWA cache) kept serving old builds; this
    checks the server directly, bypassing every cache layer. -------- */
-const APP_VER='2.8';
+const APP_VER='2.9';
 async function checkUpdate(){
   if(location.protocol!=='https:')return;
   try{
@@ -1446,6 +1446,48 @@ async function checkUpdate(){
 }
 checkUpdate();
 setInterval(checkUpdate,60000);
+
+/* -------- Install-as-App guidance --------
+   Shows once (dismissible) when running in a normal browser tab.
+   Hidden automatically when already launched from the home screen. */
+let deferredInstall=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;});
+function showInstallHint(){
+  const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+  if(standalone||localStorage.getItem('a2hsDone')||location.protocol!=='https:')return;
+  const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent);
+  const card=document.createElement('div');
+  card.style.cssText='position:fixed;left:14px;right:14px;z-index:55;'+
+    'bottom:calc(env(safe-area-inset-bottom) + 190px);'+
+    'background:#000d;border:1px solid #e8a598;border-radius:16px;padding:14px 16px;'+
+    'backdrop-filter:blur(10px);font-size:13px;line-height:1.7;color:#f3ede3';
+  const closeBtn='<button id="a2hsClose" style="position:absolute;top:8px;right:10px;'+
+    'background:none;border:none;color:#fff8;font-size:16px">✕</button>';
+  if(isIOS){
+    card.innerHTML=closeBtn+
+      '<b style="color:#e8a598">📲 安裝成 App</b><br>'+
+      '1. 點 Safari 下方的 <b>分享</b> 按鈕（□↑）<br>'+
+      '2. 往下捲，點「<b>加入主畫面</b>」<br>'+
+      '3. 之後從主畫面圖示開啟＝全螢幕 App';
+  }else if(deferredInstall){
+    card.innerHTML=closeBtn+
+      '<b style="color:#e8a598">📲 安裝成 App</b><br>一鍵安裝到主畫面，全螢幕使用。'+
+      '<button id="a2hsGo" style="display:block;margin-top:10px;padding:10px 22px;'+
+      'border-radius:24px;border:none;background:#e8a598;color:#1a1714;'+
+      'font-weight:700;font-size:13px">立即安裝</button>';
+  }else return;
+  document.body.appendChild(card);
+  card.querySelector('#a2hsClose').onclick=()=>{
+    localStorage.setItem('a2hsDone','1');card.remove();
+  };
+  const go=card.querySelector('#a2hsGo');
+  if(go)go.onclick=async()=>{
+    deferredInstall.prompt();
+    await deferredInstall.userChoice;
+    localStorage.setItem('a2hsDone','1');card.remove();
+  };
+}
+setTimeout(showInstallHint,2500);
 </script>
 </body>
 </html>
