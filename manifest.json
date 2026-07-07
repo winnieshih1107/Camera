@@ -1,0 +1,13 @@
+{
+  "name": "Pose Studio 網美姿勢相機",
+  "short_name": "PoseStudio",
+  "description": "匯入參考照，AI 抓出姿勢骨架，對齊變綠自動快門",
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1a1714",
+  "theme_color": "#1a1714",
+  "icons": [
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

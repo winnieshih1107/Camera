@@ -3,27 +3,75 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>網美引導 · Pose Studio</title>
+<title>網美引導 · Pose Studio AI</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1a1714">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PoseStudio">
+<link rel="apple-touch-icon" href="icon-512.png">
+<link rel="icon" href="icon-512.png">
 <style>
   :root{
     --ink:#1a1714;--paper:#f3ede3;--blush:#e8a598;
     --rose:#d97a6c;--sage:#8a9a7b;--gold:#c9a24b;
+    --match:#5fe08d;
     --line:rgba(255,255,255,.85);
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{height:100%}
   body{font-family:"Helvetica Neue",-apple-system,"PingFang TC","Noto Sans TC",sans-serif;
-    background:var(--ink);color:var(--paper);overflow:hidden;position:fixed;width:100%}
+    background:var(--ink);color:var(--paper);overflow:hidden;position:fixed;width:100%;
+    touch-action:none}
+  /* sliders & buttons must keep their native touch handling */
+  input[type=range],button,select{touch-action:auto}
 
   /* Camera stage */
   #stage{position:fixed;inset:0;background:#000;display:flex;align-items:center;justify-content:center}
   video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-  #overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+
+  /* Live skeleton (from camera) */
+  #liveSkel{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3}
+  #liveSkel .bone{stroke:#17d17e;stroke-width:2;fill:none;opacity:.9;stroke-linecap:round}
+  #liveSkel .joint{fill:#8b5cf6;stroke:#fff;stroke-width:1;opacity:.95}
+  #liveSkel .headring{stroke:#17d17e;stroke-width:2;fill:none;opacity:.9}
+
+  /* Imported reference photo layer (photo + horizon lines move together) */
+  #refLayer{position:absolute;inset:0;z-index:4;pointer-events:none;display:none;
+    transform-origin:center center;will-change:transform}
+  #refImg{position:absolute;pointer-events:none;object-fit:contain}
+  #refImg.full{inset:0;width:100%;height:100%}
+  #refImg.corner{width:30%;max-width:140px;border-radius:10px;
+    border:2px solid #fff9;box-shadow:0 4px 20px #000a;object-fit:cover}
+  #refImg.corner.tl{top:calc(env(safe-area-inset-top) + 110px);left:14px}
+  #horizonSvg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  #horizonSvg line{stroke:var(--gold);stroke-width:1.5;stroke-dasharray:9 7;
+    filter:drop-shadow(0 0 4px rgba(201,162,75,.8))}
+  #horizonSvg text{fill:var(--gold);font-size:10px;letter-spacing:.06em}
+
+  /* Grid + built-in pose guide overlay */
+  #gridSvg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:5}
+  #overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:5}
+  #gridLines{stroke:var(--line);stroke-width:1;opacity:0;transition:.3s}
+  #gridLines.show{opacity:.4}
+
+  /* AI extracted skeleton layer (independent transform) */
+  #skelLayer{position:absolute;inset:0;z-index:5;pointer-events:none;display:none;
+    transform-origin:center center;will-change:transform}
+  #skelSvg{width:100%;height:100%}
+  #skelSvg .bone{stroke:#ff7ea0;stroke-width:2.5;fill:none;stroke-linecap:round;
+    stroke-linejoin:round;opacity:.95;transition:stroke .25s;
+    filter:drop-shadow(0 0 4px rgba(255,120,160,.5))}
+  #skelSvg .joint{fill:#8b5cf6;stroke:#fff;stroke-width:1;opacity:.95}
+  #skelSvg .headring{stroke:#ff7ea0;stroke-width:2.5;fill:none;opacity:.95;transition:stroke .25s}
+  #skelLayer.matched .bone,#skelLayer.matched .headring{stroke:#17d17e;
+    filter:drop-shadow(0 0 6px rgba(23,209,126,.7))}
 
   /* No-camera fallback */
   #noCam{position:absolute;inset:0;display:none;flex-direction:column;
     align-items:center;justify-content:center;gap:18px;text-align:center;
-    padding:40px;background:radial-gradient(circle at 50% 30%,#2a2521,#0d0b0a)}
+    padding:40px;background:radial-gradient(circle at 50% 30%,#2a2521,#0d0b0a);z-index:5}
   #noCam h2{font-weight:300;font-size:22px;letter-spacing:.06em}
   #noCam p{font-size:14px;opacity:.6;max-width:280px;line-height:1.6}
   #noCam button{margin-top:8px;padding:13px 30px;border:1px solid var(--blush);
@@ -43,6 +91,7 @@
   #torchBtn{display:none}
   #torchBtn.on{color:#ffd700;border-color:#ffd700}
   #gridBtn.on{color:var(--blush);border-color:var(--blush)}
+  #aiBtn.on{color:var(--match);border-color:var(--match)}
 
   /* Pose name pill */
   #poseName{position:absolute;left:50%;transform:translateX(-50%);
@@ -56,15 +105,23 @@
     font-size:11px;opacity:.7;letter-spacing:.04em;text-align:center;
     max-width:72%;line-height:1.5;text-shadow:0 1px 3px #000}
 
+  /* Match score pill */
+  #scorePill{position:absolute;left:50%;transform:translateX(-50%);
+    top:calc(env(safe-area-inset-top) + 128px);z-index:6;display:none;
+    background:#0008;backdrop-filter:blur(10px);border:1px solid #ff9db4;
+    color:#ffd9e2;padding:6px 16px;border-radius:30px;font-size:12px;
+    letter-spacing:.1em;white-space:nowrap;transition:border-color .25s,color .25s}
+  #scorePill.matched{border-color:var(--match);color:var(--match)}
+
   /* Zoom control (right side) */
   #zoomCtrl{position:absolute;right:12px;top:50%;transform:translateY(-50%);
     z-index:6;display:flex;flex-direction:column;align-items:center;gap:8px;
     background:#0007;backdrop-filter:blur(8px);border:1px solid #fff2;
     border-radius:30px;padding:14px 10px}
-  #zoomTrack{height:130px;display:flex;align-items:center;justify-content:center;
-    position:relative;width:22px}
-  #zoomSlider{width:130px;transform:rotate(-90deg);accent-color:var(--blush);
-    position:absolute;cursor:pointer}
+  #zoomTrack{height:150px;display:flex;align-items:center;justify-content:center;
+    position:relative;width:34px}
+  #zoomSlider{width:150px;transform:rotate(-90deg);accent-color:var(--blush);
+    position:absolute;cursor:pointer;height:30px}
   #zoomLabel{font-size:10px;letter-spacing:.04em;opacity:.8;color:var(--blush)}
 
   /* Tap-to-focus ring */
@@ -107,28 +164,41 @@
     letter-spacing:.1em;display:flex;align-items:center;gap:6px}
   #refBtn svg{width:13px;height:13px}
 
-  /* Reference image overlay */
-  #refImg{position:absolute;pointer-events:none;z-index:4;display:none;object-fit:contain}
-  #refImg.full{inset:0;width:100%;height:100%}
-  #refImg.corner{width:30%;max-width:140px;border-radius:10px;
-    border:2px solid #fff9;box-shadow:0 4px 20px #000a;object-fit:cover}
-  #refImg.corner.tl{top:calc(env(safe-area-inset-top)+110px);left:14px}
+  /* Collapsible reference control panel */
   #refCtrl{position:absolute;left:0;right:0;z-index:6;display:none;
-    bottom:calc(env(safe-area-inset-bottom)+252px);padding:0 18px}
-  #refCtrl .box{background:#000a;backdrop-filter:blur(10px);border:1px solid #fff2;
-    border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+    bottom:calc(env(safe-area-inset-bottom) + 252px);padding:0 18px;
+    flex-direction:column;align-items:center;gap:6px;pointer-events:none}
+  #refCtrl>*{pointer-events:auto}
+  #panelToggle{background:#000a;backdrop-filter:blur(10px);border:1px solid #fff3;
+    color:#fff;padding:6px 18px;border-radius:20px;font-size:11px;
+    letter-spacing:.08em;display:flex;align-items:center;gap:6px}
+  #panelToggle .arr{display:inline-block;transition:transform .3s;font-size:9px}
+  #refCtrl.collapsed #panelToggle .arr{transform:rotate(180deg)}
+  #refCtrl .box{width:100%;background:#000a;backdrop-filter:blur(10px);border:1px solid #fff2;
+    border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;
+    overflow:hidden;max-height:400px;opacity:1;
+    transition:max-height .35s ease,opacity .3s,padding .35s}
+  #refCtrl.collapsed .box{max-height:0;opacity:0;padding:0 14px;border-width:0}
   #refCtrl .row{display:flex;align-items:center;gap:10px}
   #refCtrl .row .lab{font-size:11px;letter-spacing:.08em;opacity:.7;min-width:42px}
   #refCtrl input[type=range]{flex:1;accent-color:var(--blush);height:3px}
-  #refCtrl .modes{display:flex;gap:6px}
-  #refCtrl .modes button{flex:1;padding:8px;border-radius:20px;font-size:11px;
-    letter-spacing:.06em;border:1px solid #fff3;background:#fff1;color:#fff}
+  #refCtrl .modes{display:flex;gap:6px;flex:1}
+  #refCtrl .modes button{flex:1;padding:8px 4px;border-radius:20px;font-size:11px;
+    letter-spacing:.04em;border:1px solid #fff3;background:#fff1;color:#fff}
   #refCtrl .modes button.on{background:var(--blush);color:var(--ink);border-color:var(--blush);font-weight:600}
-  #refCtrl .clear{background:none;border:none;color:#ff9a8c;font-size:11px;letter-spacing:.06em;text-decoration:underline;align-self:flex-end}
+  #refCtrl .modes button.ong{background:var(--match);color:var(--ink);border-color:var(--match);font-weight:600}
+  #refCtrl .clear{background:none;border:none;color:#ff9a8c;font-size:11px;
+    letter-spacing:.06em;text-decoration:underline;align-self:flex-end}
+  #refCtrl .hint{font-size:10px;opacity:.5;letter-spacing:.03em;line-height:1.5}
 
-  /* Grid */
-  #gridLines{stroke:var(--line);stroke-width:1;opacity:0;transition:.3s;vector-effect:non-scaling-stroke}
-  #gridLines.show{opacity:.45}
+  /* Toast */
+  #toast{position:fixed;left:50%;top:38%;transform:translateX(-50%);z-index:50;
+    background:#000d;border:1px solid #fff3;color:#fff;padding:11px 22px;
+    border-radius:30px;font-size:13px;letter-spacing:.06em;opacity:0;
+    transition:opacity .3s;pointer-events:none;white-space:nowrap;max-width:86vw;
+    text-overflow:ellipsis;overflow:hidden}
+  #toast.show{opacity:1}
+  #toast.green{border-color:var(--match);color:var(--match)}
 
   /* Flash */
   #flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:20}
@@ -136,7 +206,7 @@
   /* Captured preview */
   #shot{position:fixed;inset:0;z-index:30;background:#000;display:none;flex-direction:column}
   #shot img{flex:1;width:100%;object-fit:contain;min-height:0}
-  #shotBar{padding:18px 24px calc(env(safe-area-inset-bottom)+22px);display:flex;gap:14px;justify-content:center}
+  #shotBar{padding:18px 24px calc(env(safe-area-inset-bottom) + 22px);display:flex;gap:14px;justify-content:center}
   #shotBar button{flex:1;max-width:160px;padding:14px;border-radius:30px;font-size:14px;letter-spacing:.06em;border:none}
   .retake{background:#fff2;color:#fff;border:1px solid #fff3 !important}
   .save{background:var(--blush);color:var(--ink);font-weight:600}
@@ -144,12 +214,12 @@
   /* Reference sheet */
   #refSheet{position:fixed;inset:0;z-index:35;background:#0d0b0aee;
     backdrop-filter:blur(6px);display:none;flex-direction:column}
-  #refSheet header{padding:calc(env(safe-area-inset-top)+18px) 22px 16px;
+  #refSheet header{padding:calc(env(safe-area-inset-top) + 18px) 22px 16px;
     display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #fff1}
   #refSheet header .t{font-size:15px;letter-spacing:.06em}
   #refSheet header .t small{display:block;font-size:11px;opacity:.5;margin-top:3px;letter-spacing:.02em}
   #refSheet header button{width:34px;height:34px;border-radius:50%;border:1px solid #fff3;background:#fff1;color:#fff;font-size:16px}
-  #refBody{flex:1;overflow-y:auto;padding:20px 22px calc(env(safe-area-inset-bottom)+24px)}
+  #refBody{flex:1;overflow-y:auto;padding:20px 22px calc(env(safe-area-inset-bottom) + 24px)}
   .refCard{margin-bottom:14px;border:1px solid #fff2;border-radius:16px;padding:18px;background:#fff0a;display:flex;flex-direction:column;gap:10px}
   .refCard h4{font-size:14px;font-weight:500;letter-spacing:.04em;color:var(--blush)}
   .refCard p{font-size:12.5px;line-height:1.7;opacity:.8}
@@ -170,7 +240,7 @@
     padding:8px 20px 12px;border-bottom:1px solid #fff1}
   #camHead .ht{font-size:15px;letter-spacing:.06em}
   #camHead button{width:30px;height:30px;border-radius:50%;border:1px solid #fff3;background:#fff1;color:#fff;font-size:14px}
-  #cpBody{flex:1;overflow-y:auto;padding:16px 20px calc(env(safe-area-inset-bottom)+20px)}
+  #cpBody{flex:1;overflow-y:auto;padding:16px 20px calc(env(safe-area-inset-bottom) + 20px)}
   .cpSec{margin-bottom:20px}
   .cpTitle{font-size:10px;letter-spacing:.14em;opacity:.45;margin-bottom:10px;text-transform:uppercase}
   .cpRow{display:flex;align-items:center;gap:8px;margin-bottom:11px}
@@ -202,25 +272,37 @@
 
 <div id="stage">
   <video id="video" playsinline autoplay muted></video>
-  <svg id="overlay" viewBox="0 0 100 140" preserveAspectRatio="xMidYMid slice">
-    <g id="gridLines">
-      <line x1="33.3" y1="0" x2="33.3" y2="140"/>
-      <line x1="66.6" y1="0" x2="66.6" y2="140"/>
-      <line x1="0" y1="46.6" x2="100" y2="46.6"/>
-      <line x1="0" y1="93.3" x2="100" y2="93.3"/>
+
+  <svg id="liveSkel"></svg>
+
+  <div id="refLayer">
+    <img id="refImg" alt="">
+    <svg id="horizonSvg"></svg>
+  </div>
+
+  <svg id="gridSvg">
+    <g id="gridLines" class="show">
+      <line x1="33.33%" y1="0" x2="33.33%" y2="100%"/>
+      <line x1="66.66%" y1="0" x2="66.66%" y2="100%"/>
+      <line x1="0" y1="33.33%" x2="100%" y2="33.33%"/>
+      <line x1="0" y1="66.66%" x2="100%" y2="66.66%"/>
     </g>
+  </svg>
+  <svg id="overlay" viewBox="0 0 100 140" preserveAspectRatio="xMidYMid meet">
     <g id="guideLayer"></g>
   </svg>
-  <img id="refImg" alt="">
+
+  <div id="skelLayer"><svg id="skelSvg"></svg></div>
+
   <div id="zoomCtrl">
     <div id="zoomTrack">
-      <input type="range" id="zoomSlider" min="1" max="5" value="1" step="0.1">
+      <input type="range" id="zoomSlider" min="0.5" max="5" value="1" step="0.1">
     </div>
     <span id="zoomLabel">1×</span>
   </div>
   <div id="noCam">
     <h2>需要相機權限</h2>
-    <p>允許相機後，畫面上會出現姿勢導引線，對齊就能拍出網美角度。</p>
+    <p id="noCamMsg">允許相機後，畫面上會出現姿勢導引線，對齊就能拍出網美角度。</p>
     <button id="retry">重新嘗試開啟相機</button>
   </div>
 </div>
@@ -235,7 +317,12 @@
         <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
       </svg>
     </button>
-    <button class="iconbtn" id="gridBtn">⊞</button>
+    <button class="iconbtn on" id="gridBtn">⊞</button>
+    <button class="iconbtn" id="aiBtn" title="AI 對齊偵測">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+        <circle cx="12" cy="5" r="3"/><path d="M12 8v6M12 14l-4 6M12 14l4 6M6 11h12"/>
+      </svg>
+    </button>
     <button class="iconbtn" id="camSettingsBtn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
         <circle cx="12" cy="12" r="3"/>
@@ -252,17 +339,39 @@
 
 <div id="poseName"><span class="dot"></span><span id="poseLabel">斜肩側身</span></div>
 <div id="poseTip">身體側 45 度，重心放後腳，上巴微收</div>
+<div id="scorePill">重合度 --%</div>
 
 <div id="refCtrl">
-  <div class="box">
-    <div class="modes">
-      <button id="mFull" class="on">全畫面（半透）</button>
-      <button id="mCorner">貼角落（縮圖）</button>
+  <button id="panelToggle"><span class="arr">▾</span><span id="panelToggleTxt">收合面板</span></button>
+  <div class="box" id="refBox">
+    <div class="row">
+      <span class="lab">顯示</span>
+      <div class="modes">
+        <button id="mFull" class="on">全畫面（半透）</button>
+        <button id="mCorner">貼角落（縮圖）</button>
+      </div>
     </div>
     <div class="row">
       <span class="lab">透明度</span>
       <input type="range" id="opSlider" min="10" max="100" value="45">
     </div>
+    <div class="row">
+      <span class="lab">手勢</span>
+      <div class="modes" id="tgtModes">
+        <button data-t="skel" class="on">移骨架</button>
+        <button data-t="photo">移照片</button>
+        <button data-t="none">鎖定</button>
+      </div>
+    </div>
+    <div class="row">
+      <span class="lab">AI</span>
+      <div class="modes">
+        <button id="aiToggle">AI 對齊</button>
+        <button id="autoBtn">自動快門</button>
+        <button id="resetTf">重置位置</button>
+      </div>
+    </div>
+    <p class="hint">手機：單指拖曳＝移動，兩指＝縮放／旋轉；「鎖定」時兩指＝相機變焦。電腦：滑鼠拖曳＝移動，Shift＋滾輪＝縮放骨架／照片，滾輪或右側滑桿＝相機變焦。</p>
     <button class="clear" id="clearRef">移除參考圖</button>
   </div>
 </div>
@@ -285,6 +394,7 @@
   </div>
 </div>
 
+<div id="toast"></div>
 <div id="flash"></div>
 
 <div id="shot">
@@ -319,13 +429,27 @@
 <div id="intro">
   <div class="logo">網 美 姿 勢 引 導</div>
   <h1>對齊<em>角度</em><br>拍出<em>網美感</em></h1>
-  <p>選場景 → 挑姿勢 → 對準畫面上的引導線站好姿勢，快拍快速。</p>
+  <p>匯入喜歡的網美照 → AI 自動抓出姿勢骨架 → 對齊骨架變綠就拍。</p>
   <button id="start">開啟相機</button>
 </div>
 
 <canvas id="canvas" style="display:none"></canvas>
 
 <script>
+/* Classic (non-module) script: catches errors even when the module below
+   fails to parse on older browsers, so failures are visible on screen. */
+window.addEventListener('error',function(e){
+  var d=document.getElementById('errBar');
+  if(!d){
+    d=document.createElement('div');d.id='errBar';
+    d.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:99;background:#b3261e;color:#fff;font-size:11px;line-height:1.5;padding:8px 12px;font-family:monospace;white-space:pre-wrap;word-break:break-all';
+    document.body.appendChild(d);
+  }
+  d.textContent='⚠ 程式錯誤：'+(e.message||'unknown')+(e.lineno?('（第 '+e.lineno+' 行）'):'')+'\n請截圖此訊息回報。';
+},true);
+</script>
+
+<script type="module">
 const A=s=>document.querySelector(s);
 
 /* -------- Pose library -------- */
@@ -333,6 +457,7 @@ const CATS=[
   {id:'cafe',name:'咖啡廳 / 室內'},
   {id:'nature',name:'自然 / 山海'},
   {id:'city',name:'街市 / 地標'},
+  {id:'fit',name:'健身 / 運動'},
 ];
 const stroke=`stroke="#ffb7a8" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"`;
 const soft=`stroke="#ffffff" stroke-width="1" fill="none" stroke-dasharray="3 3" opacity="0.55" vector-effect="non-scaling-stroke"`;
@@ -388,11 +513,62 @@ const POSES=[
  tip:'抬頭看高樓，廣角貼近，建築線條往上消失點',
  howto:'站在高樓或地標下方抬頭仰望，用廣角從低往後貼近往上拍。建築線條拍到往上消失點，讓妳顯得修長而張開。',
  svg:`${head(50,52,6.5)}<path d="M50 59 L50 86 M50 66 L40 74 M50 66 L60 74" ${stroke}/><path d="M14 130 L42 30 M86 130 L58 30" ${soft}/>${lbl(50,118,'建築線往上消')}`},
+{cat:'fit',name:'深蹲',q:'深蹲 標準姿勢 squat form 健身',
+ tip:'腳與肩同寬，臀往後坐，大腿蹲到與地面平行',
+ howto:'雙腳與肩同寬、腳尖微外八。想像往後坐椅子，臀部向後推、膝蓋順著腳尖方向蹲下，大腿到與地面平行。背打直、核心收緊，雙手向前平舉保持平衡。側面拍最能檢查動作。',
+ svg:`${head(50,36)}<path d="M50 42 L50 62 M50 48 L28 46 M50 48 L72 46 M50 62 L36 70 L38 88 M50 62 L64 70 L62 88" ${stroke}/><line x1="20" y1="70" x2="80" y2="70" ${soft}/>${lbl(50,102,'大腿與地面平行')}`},
+{cat:'fit',name:'弓步蹲',q:'弓步蹲 lunge 標準姿勢 健身',
+ tip:'前膝 90 度不超過腳尖，後膝往下沉、上身保持直立',
+ howto:'跨出一大步，前腳膝蓋彎 90 度、膝蓋不要超過腳尖；後腳膝蓋垂直往地面沉。上身保持直立、骨盆朝正前方，雙手插腰或自然下垂。從正側面拍攝檢查前膝角度。',
+ svg:`${head(46,34)}<path d="M46 40 L46 68 M46 48 L38 58 M46 48 L54 58 M46 68 L60 76 L60 94 M46 68 L34 82 L42 96" ${stroke}/><line x1="60" y1="70" x2="60" y2="100" ${soft}/>${lbl(60,110,'前膝不超過腳尖')}`},
+{cat:'fit',name:'平板支撐',q:'平板支撐 plank 標準姿勢',
+ tip:'手肘在肩膀正下方，肩背臀踝連成一直線',
+ howto:'手肘撐地、位於肩膀正下方，雙腳往後伸直用腳尖撐地。收緊核心與臀部，讓肩、背、臀、腳踝連成一直線，不塌腰也不翹屁股。請人從正側面平拍，最容易看出身體有沒有一直線。',
+ svg:`${head(24,68,5.5)}<path d="M30 74 L74 84 M32 76 L32 92 M74 84 L80 94" ${stroke}/><line x1="22" y1="66" x2="82" y2="80" ${soft}/>${lbl(52,108,'肩背臀一直線')}`},
+{cat:'fit',name:'伏地挺身',q:'伏地挺身 push up 標準姿勢',
+ tip:'雙手略寬於肩，身體一直線下降到手肘 90 度',
+ howto:'雙手撐地略寬於肩，身體從頭到腳跟保持一直線。下降時手肘約 45 度往後收，胸口接近地面再推起，全程核心收緊不塌腰。側面平拍檢查身體線條。',
+ svg:`${head(24,60,5.5)}<path d="M30 66 L76 78 M34 68 L34 92 M76 78 L82 92" ${stroke}/><line x1="20" y1="94" x2="86" y2="94" ${soft}/>${lbl(52,110,'身體一直線下壓')}`},
+{cat:'fit',name:'橋式',q:'橋式 glute bridge 臀橋 標準姿勢',
+ tip:'躺姿屈膝，臀部抬起讓肩、髖、膝成一直線',
+ howto:'仰躺屈膝、腳掌踩地與臀部約一個手掌距離。夾臀發力把髖部往上推，直到肩膀、髖、膝蓋連成一條斜線，頂端停一秒再放下。側面平拍檢查髖有沒有推到位。',
+ svg:`${head(18,86,5.5)}<path d="M24 90 L48 74 L62 78 L66 94 M48 74 L52 78" ${stroke}/><line x1="24" y1="90" x2="64" y2="76" ${soft}/><line x1="10" y1="98" x2="90" y2="98" ${soft}/>${lbl(50,112,'肩髖膝一直線')}`},
+{cat:'fit',name:'站姿肩推',q:'肩推 overhead press 標準姿勢 健身',
+ tip:'手臂垂直推過頭頂，肋骨收好不折腰',
+ howto:'雙腳與肩同寬站穩，核心收緊。把重量（或空手）從肩膀垂直往上推到手臂伸直、貼近耳朵，肋骨不外翻、腰不過度後仰。正面或側面拍皆可檢查手臂是否垂直。',
+ svg:`${head(50,40)}<path d="M50 46 L50 78 M50 52 L38 42 L36 28 M50 52 L62 42 L64 28 M50 78 L42 102 M50 78 L58 102" ${stroke}/><line x1="36" y1="24" x2="64" y2="24" ${soft}/>${lbl(50,16,'手臂伸直過頭')}`},
 ];
 
 /* -------- State -------- */
-let curCat='cafe', curPose=null, mirror=true, facing='user', stream=null, gridOn=false;
+let curCat='cafe', curPose=null, mirror=true, facing='user', stream=null, gridOn=true;
 let zoomLevel=1, torchOn=false, cameraDevices=[], curDeviceId=null;
+
+/* AI / reference state */
+let landmarker=null, landmarkerLoading=null;
+let refLm=null;            // 33 landmarks (normalized 0..1) of imported photo
+let refDims=null;          // {w,h} natural size of imported photo
+let refNorm=null;          // normalized joint vector for matching
+let liveOn=false, autoShot=false;
+let matchEMA=0, matchStreak=0, cooldownUntil=0;
+let gestureTarget='skel';
+const tf={skel:{x:0,y:0,s:1,r:0},photo:{x:0,y:0,s:1,r:0}};
+
+/* MediaPipe landmark connections for stick figure */
+const CONN=[[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],
+            [23,25],[25,27],[24,26],[26,28],[27,31],[28,32],
+            [15,17],[15,19],[15,21],[16,18],[16,20],[16,22],   // hands
+            [27,29],[28,30],[29,31],[30,32]];                  // feet
+const KEY=[11,12,13,14,15,16,23,24,25,26,27,28];
+const EXTRA=[17,18,19,20,21,22,29,30,31,32]; // hand & foot tips — small dots only
+
+/* -------- Toast -------- */
+let toastTimer=null;
+function toast(msg,green=false){
+  const t=A('#toast');
+  t.textContent=msg; t.classList.toggle('green',green); t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),2200);
+}
 
 /* -------- Pose UI -------- */
 const catsEl=A('#cats');
@@ -425,49 +601,104 @@ function selectPose(idx){
   document.querySelectorAll('.pose').forEach(x=>x.classList.toggle('on',+x.dataset.idx===idx));
 }
 
-/* -------- Camera core -------- */
+/* -------- Camera core --------
+   Zoom strategy: prefer the device's optical/native zoom; only the part the
+   hardware can't cover is done with CSS scaling. Never both at full strength
+   (that used to multiply into a huge zoom). Range 0.5×–5×; below the
+   hardware minimum the preview shrinks with letterboxing. */
+let appliedNativeZoom=1;
+function nativeZoomCaps(){
+  if(!stream) return null;
+  const caps=stream.getVideoTracks()[0].getCapabilities?.();
+  return (caps&&caps.zoom)?caps.zoom:null;
+}
+function cssZoom(){ return zoomLevel/appliedNativeZoom; }
 function updateVideoTransform(){
   const v=A('#video');
-  const mx=(facing==='user'&&mirror)?-zoomLevel:zoomLevel;
-  v.style.transform=`scaleX(${mx}) scaleY(${zoomLevel})`;
-}
-function tryNativeZoom(level){
-  if(!stream)return;
-  const track=stream.getVideoTracks()[0];
-  const caps=track.getCapabilities?.();
-  if(caps?.zoom){
-    const z=caps.zoom.min+(caps.zoom.max-caps.zoom.min)*((level-1)/4);
-    track.applyConstraints({advanced:[{zoom:z}]}).catch(()=>{});
-  }
+  const cz=cssZoom();
+  const mx=(facing==='user'&&mirror)?-cz:cz;
+  v.style.transform=`scaleX(${mx}) scaleY(${cz})`;
 }
 function setZoom(level){
-  zoomLevel=Math.max(1,Math.min(5,level));
+  zoomLevel=Math.max(0.5,Math.min(5,level));
+  const nz=nativeZoomCaps();
+  if(nz){
+    const z=Math.max(nz.min,Math.min(nz.max,zoomLevel));
+    stream.getVideoTracks()[0].applyConstraints({advanced:[{zoom:z}]}).catch(()=>{});
+    appliedNativeZoom=z;
+  }else{
+    appliedNativeZoom=1;
+  }
   A('#zoomSlider').value=zoomLevel;
   A('#zoomLabel').textContent=zoomLevel.toFixed(1)+'×';
   updateVideoTransform();
-  tryNativeZoom(zoomLevel);
 }
+A('#zoomLabel').onclick=()=>setZoom(1); // tap the ×-label to reset
 async function enumCameras(){
   try{
     const devs=await navigator.mediaDevices.enumerateDevices();
     cameraDevices=devs.filter(d=>d.kind==='videoinput');
   }catch(e){}
 }
+function camFail(msg){
+  A('#noCam').style.display='flex';
+  A('#noCamMsg').textContent=msg;
+}
+function inAppBrowser(){
+  const ua=navigator.userAgent;
+  if(/Line\//i.test(ua)) return 'LINE';
+  if(/FBAN|FBAV|FB_IAB/i.test(ua)) return 'Facebook';
+  if(/Instagram/i.test(ua)) return 'Instagram';
+  if(/MicroMessenger/i.test(ua)) return 'WeChat';
+  if(/TikTok|musical_ly/i.test(ua)) return 'TikTok';
+  return null;
+}
+const IN_APP_HINT=app=>'你正在 '+app+' 的內建瀏覽器裡開啟本頁，它不允許使用相機。請點右上角「⋯」或分享選單，選「以瀏覽器開啟 / 在 Safari（Chrome）中開啟」，再重新允許相機。';
 async function startCam(){
-  try{
-    if(stream)stream.getTracks().forEach(t=>t.stop());
-    const vc=curDeviceId
-      ?{deviceId:{exact:curDeviceId},width:{ideal:1920},height:{ideal:1080}}
-      :{facingMode:facing,width:{ideal:1080},height:{ideal:1920}};
-    stream=await navigator.mediaDevices.getUserMedia({video:vc,audio:false});
-    const v=A('#video'); v.srcObject=stream; A('#noCam').style.display='none';
-    updateVideoTransform();
-    tryNativeZoom(zoomLevel);
-    // Torch: reset + check support
-    torchOn=false; A('#torchBtn').classList.remove('on');
-    const caps=stream.getVideoTracks()[0].getCapabilities?.()??{};
-    A('#torchBtn').style.display=caps.torch?'flex':'none';
-  }catch(e){ A('#noCam').style.display='flex'; }
+  // 0) in-app browsers (LINE / FB / IG…) block the camera outright
+  const app=inAppBrowser();
+  // 1) API not available at all → insecure origin (file://, http://IP) or in-app webview
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    camFail(app?IN_APP_HINT(app)
+      :window.isSecureContext
+      ?'此瀏覽器不支援相機 API，請改用最新版 Chrome / Edge / Safari 開啟。'
+      :'瀏覽器封鎖了相機：本頁目前是用 file:// 或 http://IP 開啟的。請改用 https:// 網址，或在電腦上用 http://localhost 開啟。');
+    return;
+  }
+  if(stream)stream.getTracks().forEach(t=>t.stop());
+  // 2) try from strict to loose constraints — some devices reject ideal sizes
+  const variants=curDeviceId
+    ?[{deviceId:{exact:curDeviceId},width:{ideal:1920},height:{ideal:1080}},
+      {deviceId:{exact:curDeviceId}}]
+    :[{facingMode:facing,width:{ideal:1080},height:{ideal:1920}},
+      {facingMode:facing},
+      true];
+  let lastErr=null;
+  for(const vc of variants){
+    try{
+      stream=await navigator.mediaDevices.getUserMedia({video:vc,audio:false});
+      lastErr=null; break;
+    }catch(e){ lastErr=e; stream=null; }
+  }
+  if(!stream){
+    const n=lastErr?.name||'';
+    camFail(
+      (n==='NotAllowedError'&&app)?IN_APP_HINT(app):
+      n==='NotAllowedError'?'相機權限被拒絕了。請點瀏覽器網址列旁的相機／鎖頭圖示，把「相機」改為允許，再按下方重試。（手機：瀏覽器設定 → 網站設定 → 相機；iPhone 另檢查 設定 → Safari → 相機 = 詢問或允許）':
+      n==='NotFoundError'?'找不到相機裝置。請確認裝置有鏡頭、筆電鏡頭沒有被實體開關關閉。':
+      n==='NotReadableError'?'相機正被其他程式佔用（如 Zoom / Teams / 相機App），請先關閉它們再重試。':
+      n==='OverconstrainedError'?'相機不支援要求的規格，請按重試改用預設規格。':
+      '無法開啟相機（'+n+'）'+(lastErr?.message?'：'+lastErr.message:'')+'。請截圖此訊息回報。');
+    return;
+  }
+  const v=A('#video'); v.srcObject=stream; A('#noCam').style.display='none';
+  try{ await v.play(); }catch(e){} // some mobile browsers need an explicit play()
+  setZoom(zoomLevel);
+  torchOn=false; A('#torchBtn').classList.remove('on');
+  const caps=stream.getVideoTracks()[0].getCapabilities?.()??{};
+  A('#torchBtn').style.display=caps.torch?'flex':'none';
+  // labels only appear after permission granted → refresh device list
+  enumCameras();
 }
 
 /* -------- Torch -------- */
@@ -487,16 +718,12 @@ A('#video').addEventListener('click',async e=>{
   setTimeout(()=>ring.classList.remove('active'),700);
   const track=stream.getVideoTracks()[0];
   const caps=track.getCapabilities?.()??{};
-  if(caps.focusMode?.includes('single-shot')){
-    const r=A('#video').getBoundingClientRect();
-    const x=(e.clientX-r.left)/r.width, y=(e.clientY-r.top)/r.height;
+  const r=A('#video').getBoundingClientRect();
+  const x=(e.clientX-r.left)/r.width, y=(e.clientY-r.top)/r.height;
+  if(caps.focusMode?.includes('single-shot'))
     track.applyConstraints({advanced:[{focusMode:'single-shot',pointsOfInterest:[{x,y}]}]}).catch(()=>{});
-  }
-  if(caps.exposureMode?.includes('single-shot')){
-    const r=A('#video').getBoundingClientRect();
-    const x=(e.clientX-r.left)/r.width, y=(e.clientY-r.top)/r.height;
+  if(caps.exposureMode?.includes('single-shot'))
     track.applyConstraints({advanced:[{exposureMode:'single-shot',pointsOfInterest:[{x,y}]}]}).catch(()=>{});
-  }
 });
 
 /* -------- Camera settings panel -------- */
@@ -507,7 +734,6 @@ function buildCamPanel(){
   const settings=track.getSettings?.()??{};
   let html='';
 
-  // Camera selector
   if(cameraDevices.length>1){
     html+=`<div class="cpSec"><div class="cpTitle">選擇鏡頭</div><div class="cpRow">
       <select class="cpSel" id="camDevSel">`;
@@ -518,7 +744,6 @@ function buildCamPanel(){
     html+=`</select></div></div>`;
   }
 
-  // Focus
   if(caps.focusMode){
     const fmL={auto:'自動',manual:'手動',continuous:'連續追焦','single-shot':'單次'};
     html+=`<div class="cpSec"><div class="cpTitle">對焦</div>
@@ -538,7 +763,6 @@ function buildCamPanel(){
     html+=`<p class="cpNote">點擊畫面可點選對焦位置</p></div>`;
   }
 
-  // Exposure
   const hasExp=caps.exposureMode||caps.exposureCompensation||caps.exposureTime||caps.iso;
   if(hasExp){
     html+=`<div class="cpSec"><div class="cpTitle">曝光</div>`;
@@ -574,7 +798,6 @@ function buildCamPanel(){
     html+=`</div>`;
   }
 
-  // White balance
   if(caps.whiteBalanceMode||caps.colorTemperature){
     html+=`<div class="cpSec"><div class="cpTitle">白平衡</div>`;
     if(caps.whiteBalanceMode){
@@ -596,7 +819,6 @@ function buildCamPanel(){
     html+=`</div>`;
   }
 
-  // Image adjustments
   const adj=[
     {key:'brightness',label:'亮度'},
     {key:'contrast',label:'對比'},
@@ -615,7 +837,6 @@ function buildCamPanel(){
     html+=`</div>`;
   }
 
-  // Pan / Tilt
   if(caps.pan||caps.tilt){
     html+=`<div class="cpSec"><div class="cpTitle">雲台</div>`;
     if(caps.pan){
@@ -636,10 +857,8 @@ function buildCamPanel(){
   if(!html) html='<p class="cpEmpty">此裝置不支援進階相機設定</p>';
   A('#cpBody').innerHTML=html;
 
-  // Wire events
   if(A('#camDevSel')) A('#camDevSel').onchange=e=>{curDeviceId=e.target.value;setZoom(1);startCam();A('#camPanel').classList.remove('open');};
 
-  // Toggle groups
   [['#focusTog','focusMode'],['#expTog','exposureMode'],['#wbTog','whiteBalanceMode']].forEach(([sel,key])=>{
     const g=A(sel); if(!g)return;
     g.querySelectorAll('button').forEach(btn=>{
@@ -651,7 +870,6 @@ function buildCamPanel(){
     });
   });
 
-  // Range sliders
   A('#cpBody').querySelectorAll('.cpRange').forEach(el=>{
     el.oninput=()=>{
       const key=el.dataset.key, val=parseFloat(el.value);
@@ -671,20 +889,412 @@ A('#camSettingsBtn').onclick=()=>{buildCamPanel();A('#camPanel').classList.add('
 A('#camClose').onclick=()=>A('#camPanel').classList.remove('open');
 A('#camPanelBg').onclick=()=>A('#camPanel').classList.remove('open');
 
-/* -------- Zoom controls -------- */
-A('#zoomSlider').oninput=()=>setZoom(+A('#zoomSlider').value);
-let pinchDist0=null;
+/* ================================================================
+   Feature 1: AI pose extraction (MediaPipe PoseLandmarker)
+   ================================================================ */
+async function ensureLandmarker(){
+  if(landmarker) return landmarker;
+  if(landmarkerLoading) return landmarkerLoading;
+  toast('AI 模型載入中…（首次需數秒）');
+  landmarkerLoading=(async()=>{
+    const CDN='https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+    const mod=await import(CDN);
+    const fileset=await mod.FilesetResolver.forVisionTasks(CDN+'/wasm');
+    landmarker=await mod.PoseLandmarker.createFromOptions(fileset,{
+      baseOptions:{
+        modelAssetPath:'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
+        delegate:'GPU'
+      },
+      runningMode:'VIDEO',
+      numPoses:1
+    });
+    return landmarker;
+  })();
+  try{ return await landmarkerLoading; }
+  catch(e){
+    landmarkerLoading=null;
+    toast('AI 模型載入失敗，請確認網路連線');
+    throw e;
+  }
+}
+
+/* Normalize pose for similarity comparison: center at mid-hip,
+   scale by torso length, in isotropic (pixel-ratio) units */
+const VIS=0.5; // landmarks below this visibility are off-frame guesses — ignore them
+function normPose(lm,w,h){
+  const px=i=>({x:lm[i].x*w,y:lm[i].y*h,v:lm[i].visibility??1});
+  const lh=px(23),rh=px(24),ls=px(11),rs=px(12);
+  const cx=(lh.x+rh.x)/2, cy=(lh.y+rh.y)/2;
+  const sx=(ls.x+rs.x)/2, sy=(ls.y+rs.y)/2;
+  const torso=Math.hypot(sx-cx,sy-cy)||1e-4;
+  return KEY.map(i=>{const p=px(i);
+    return p.v<VIS?null:{x:(p.x-cx)/torso,y:(p.y-cy)/torso};});
+}
+function poseSim(a,b){
+  let d=0,n=0;
+  for(let i=0;i<a.length;i++){
+    if(a[i]&&b[i]){d+=Math.hypot(a[i].x-b[i].x,a[i].y-b[i].y);n++;}
+  }
+  if(n<5) return 0; // too few shared joints to judge
+  return Math.max(0,1-(d/n)/1.8);
+}
+function bestSim(liveN){
+  if(!refNorm||!liveN) return 0;
+  const mir=liveN.map(p=>p&&{x:-p.x,y:p.y});
+  return Math.max(poseSim(refNorm,liveN),poseSim(refNorm,mir));
+}
+
+/* Stick-figure SVG builder from viewport-pixel points */
+function skeletonSvg(pts,cls){
+  let s='';
+  CONN.forEach(([a,b])=>{
+    if(pts[a]&&pts[b])
+      s+=`<line class="bone" x1="${pts[a].x.toFixed(1)}" y1="${pts[a].y.toFixed(1)}" x2="${pts[b].x.toFixed(1)}" y2="${pts[b].y.toFixed(1)}"/>`;
+  });
+  // head ring from ears (7,8) or nose fallback
+  if(pts[7]&&pts[8]){
+    const hx=(pts[7].x+pts[8].x)/2, hy=(pts[7].y+pts[8].y)/2;
+    let r=Math.hypot(pts[7].x-pts[8].x,pts[7].y-pts[8].y)*0.85;
+    if(r<6&&pts[11]&&pts[23]) r=Math.hypot(pts[11].x-pts[23].x,pts[11].y-pts[23].y)*0.3;
+    s+=`<circle class="headring" cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="${Math.max(r,6).toFixed(1)}"/>`;
+    // neck: head to mid-shoulder
+    if(pts[11]&&pts[12]){
+      const nx=(pts[11].x+pts[12].x)/2, ny=(pts[11].y+pts[12].y)/2;
+      s+=`<line class="bone" x1="${hx.toFixed(1)}" y1="${(hy+Math.max(r,6)).toFixed(1)}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}"/>`;
+    }
+  }
+  KEY.forEach(i=>{
+    if(pts[i]) s+=`<circle class="joint" cx="${pts[i].x.toFixed(1)}" cy="${pts[i].y.toFixed(1)}" r="3.5"/>`;
+  });
+  EXTRA.forEach(i=>{
+    if(pts[i]) s+=`<circle class="joint" cx="${pts[i].x.toFixed(1)}" cy="${pts[i].y.toFixed(1)}" r="2.3"/>`;
+  });
+  return s;
+}
+
+/* Displayed rect of the ref photo (object-fit:contain, fullscreen) */
+function containRect(nw,nh){
+  const W=innerWidth,H=innerHeight;
+  const s=Math.min(W/nw,H/nh);
+  return {x:(W-nw*s)/2,y:(H-nh*s)/2,w:nw*s,h:nh*s};
+}
+function drawRefSkeleton(){
+  const svg=A('#skelSvg');
+  svg.setAttribute('viewBox',`0 0 ${innerWidth} ${innerHeight}`);
+  if(!refLm||!refDims){svg.innerHTML='';return;}
+  const r=containRect(refDims.w,refDims.h);
+  const pts=refLm.map(p=>(p.visibility??1)<VIS?null:{x:r.x+p.x*r.w,y:r.y+p.y*r.h});
+  svg.innerHTML=skeletonSvg(pts);
+  A('#skelLayer').style.display='block';
+}
+
+/* ================================================================
+   Feature 3b: horizon / environment line detection (row gradient)
+   ================================================================ */
+function detectHorizons(img){
+  try{
+    const W=240, H=Math.max(60,Math.round(img.naturalHeight*W/img.naturalWidth));
+    const c=document.createElement('canvas'); c.width=W; c.height=H;
+    const x=c.getContext('2d',{willReadFrequently:true});
+    x.drawImage(img,0,0,W,H);
+    const d=x.getImageData(0,0,W,H).data;
+    const gray=new Float32Array(W*H);
+    for(let i=0;i<W*H;i++) gray[i]=d[i*4]*0.3+d[i*4+1]*0.59+d[i*4+2]*0.11;
+    const energy=new Float32Array(H);
+    for(let y=1;y<H-1;y++){
+      let e=0;
+      for(let px=0;px<W;px++) e+=Math.abs(gray[(y+1)*W+px]-gray[(y-1)*W+px]);
+      energy[y]=e/W;
+    }
+    // smooth
+    const sm=new Float32Array(H);
+    for(let y=2;y<H-2;y++) sm[y]=(energy[y-2]+energy[y-1]+energy[y]+energy[y+1]+energy[y+2])/5;
+    const mean=sm.reduce((a,b)=>a+b,0)/H;
+    // find peaks
+    const peaks=[];
+    for(let y=Math.round(H*0.12);y<H*0.92;y++){
+      if(sm[y]>mean*2.2&&sm[y]>=sm[y-1]&&sm[y]>=sm[y+1]) peaks.push({y,v:sm[y]});
+    }
+    peaks.sort((a,b)=>b.v-a.v);
+    const picked=[];
+    for(const p of peaks){
+      if(picked.every(q=>Math.abs(q-p.y)>H*0.09)) picked.push(p.y);
+      if(picked.length>=2) break;
+    }
+    return picked.map(y=>y/H);
+  }catch(e){ return []; }
+}
+function drawHorizons(nys){
+  const svg=A('#horizonSvg');
+  svg.setAttribute('viewBox',`0 0 ${innerWidth} ${innerHeight}`);
+  if(!refDims||!nys.length){svg.innerHTML='';return;}
+  const r=containRect(refDims.w,refDims.h);
+  svg.innerHTML=nys.map((ny,i)=>{
+    const y=(r.y+ny*r.h).toFixed(1);
+    return `<line x1="${r.x.toFixed(1)}" y1="${y}" x2="${(r.x+r.w).toFixed(1)}" y2="${y}"/>
+      <text x="${(r.x+8).toFixed(1)}" y="${(+y-6).toFixed(1)}">環境水平線</text>`;
+  }).join('');
+}
+let lastHorizons=[];
+
+/* ================================================================
+   Import reference photo → run AI extraction
+   ================================================================ */
+let refMode='full';
+A('#importInput').onchange=e=>{
+  const f=e.target.files[0]; if(!f)return;
+  const img=A('#refImg');
+  img.onload=async()=>{
+    refDims={w:img.naturalWidth,h:img.naturalHeight};
+    A('#refLayer').style.display='block';
+    setRefMode(refMode); applyOpacity();
+    A('#refCtrl').style.display='flex';
+    A('#refCtrl').classList.remove('collapsed');
+    resetPanelAutoCollapse();
+    A('#refSheet').style.display='none';
+    // horizon lines (fast, local)
+    lastHorizons=detectHorizons(img);
+    drawHorizons(lastHorizons);
+    if(lastHorizons.length) toast('已偵測環境水平線（金色虛線）');
+    // AI skeleton extraction
+    try{
+      const lm=await ensureLandmarker();
+      await lm.setOptions({runningMode:'IMAGE'});
+      const res=lm.detect(img);
+      await lm.setOptions({runningMode:'VIDEO'});
+      if(res.landmarks&&res.landmarks.length){
+        refLm=res.landmarks[0];
+        refNorm=normPose(refLm,refDims.w,refDims.h);
+        tf.skel={x:0,y:0,s:1,r:0}; applyTf('skel');
+        drawRefSkeleton();
+        gestureTarget='skel'; syncTgtButtons();
+        toast('AI 已擷取姿勢骨架，可拖曳／縮放對齊',true);
+      }else{
+        refLm=null;refNorm=null;A('#skelLayer').style.display='none';
+        toast('照片中未偵測到人物姿勢');
+      }
+    }catch(err){ /* model load failed — manual overlay still works */ }
+  };
+  img.src=URL.createObjectURL(f);
+  e.target.value='';
+};
+
+function setRefMode(m){
+  refMode=m; const img=A('#refImg');
+  img.className=(m==='full')?'full':'corner tl';
+  A('#mFull').classList.toggle('on',m==='full');
+  A('#mCorner').classList.toggle('on',m==='corner');
+  A('#opSlider').parentElement.style.opacity=(m==='corner')?'.4':'1';
+  A('#horizonSvg').style.display=(m==='full')?'block':'none';
+  if(m==='corner'){ tf.photo={x:0,y:0,s:1,r:0}; applyTf('photo'); }
+}
+function applyOpacity(){ A('#refImg').style.opacity=(A('#opSlider').value/100).toFixed(2); }
+A('#mFull').onclick=()=>{setRefMode('full');applyOpacity();resetPanelAutoCollapse();};
+A('#mCorner').onclick=()=>{setRefMode('corner');A('#refImg').style.opacity='1';resetPanelAutoCollapse();};
+A('#opSlider').oninput=()=>{if(refMode==='full')applyOpacity();resetPanelAutoCollapse();};
+A('#clearRef').onclick=()=>{
+  A('#refLayer').style.display='none';A('#refImg').src='';
+  A('#skelLayer').style.display='none';A('#skelSvg').innerHTML='';
+  A('#horizonSvg').innerHTML='';
+  A('#refCtrl').style.display='none';
+  refLm=null;refNorm=null;refDims=null;lastHorizons=[];
+  stopLive();
+};
+
+/* ================================================================
+   Feature 5: collapsible control panel
+   ================================================================ */
+let panelTimer=null;
+function setPanelCollapsed(c){
+  A('#refCtrl').classList.toggle('collapsed',c);
+  A('#panelToggleTxt').textContent=c?'調整面板':'收合面板';
+}
+A('#panelToggle').onclick=()=>{
+  const c=!A('#refCtrl').classList.contains('collapsed');
+  setPanelCollapsed(c);
+  if(!c) resetPanelAutoCollapse();
+};
+function resetPanelAutoCollapse(){
+  clearTimeout(panelTimer);
+  panelTimer=setTimeout(()=>setPanelCollapsed(true),6000);
+}
+
+/* ================================================================
+   Feature 2: multi-touch move / scale / rotate for skeleton & photo
+   ================================================================ */
+function syncTgtButtons(){
+  document.querySelectorAll('#tgtModes button').forEach(b=>
+    b.classList.toggle('on',b.dataset.t===gestureTarget));
+}
+document.querySelectorAll('#tgtModes button').forEach(b=>{
+  b.onclick=()=>{gestureTarget=b.dataset.t;syncTgtButtons();resetPanelAutoCollapse();};
+});
+function applyTf(t){
+  const o=tf[t];
+  const el=(t==='skel')?A('#skelLayer'):A('#refLayer');
+  el.style.transform=`translate(${o.x}px,${o.y}px) rotate(${o.r}deg) scale(${o.s})`;
+}
+A('#resetTf').onclick=()=>{
+  tf.skel={x:0,y:0,s:1,r:0};tf.photo={x:0,y:0,s:1,r:0};
+  applyTf('skel');applyTf('photo');
+  toast('已重置骨架與照片位置');resetPanelAutoCollapse();
+};
+
+let gest=null, pinchDist0=null;
+/* touches that start on UI controls must not drive layer/zoom gestures */
+const onCtrlEl=t=>!!(t&&t.closest&&t.closest('#zoomCtrl,#refCtrl,#topbar,#bottom,#refBtn,#poseName,#scorePill,#noCam'));
+function touchInfo(e){
+  if(e.touches.length===1)
+    return {n:1,x:e.touches[0].clientX,y:e.touches[0].clientY};
+  const t0=e.touches[0],t1=e.touches[1];
+  return {n:2,
+    x:(t0.clientX+t1.clientX)/2, y:(t0.clientY+t1.clientY)/2,
+    d:Math.hypot(t0.clientX-t1.clientX,t0.clientY-t1.clientY),
+    a:Math.atan2(t1.clientY-t0.clientY,t1.clientX-t0.clientX)*180/Math.PI};
+}
+function manipActive(){
+  return gestureTarget!=='none' && A('#refLayer').style.display==='block' &&
+    (gestureTarget==='photo' ? refMode==='full' : A('#skelLayer').style.display==='block');
+}
 A('#stage').addEventListener('touchstart',e=>{
-  if(e.touches.length===2)
+  if(onCtrlEl(e.target)) return;
+  if(manipActive()){
+    gest={start:touchInfo(e),tf0:{...tf[gestureTarget]}};
+  }else if(e.touches.length===2){
     pinchDist0=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+  }
 },{passive:true});
 A('#stage').addEventListener('touchmove',e=>{
-  if(e.touches.length===2&&pinchDist0){
+  if(gest&&manipActive()){
+    const now=touchInfo(e);
+    if(now.n!==gest.start.n){ gest={start:now,tf0:{...tf[gestureTarget]}}; return; }
+    const o=tf[gestureTarget], s0=gest.tf0;
+    o.x=s0.x+(now.x-gest.start.x);
+    o.y=s0.y+(now.y-gest.start.y);
+    if(now.n===2){
+      o.s=Math.max(.25,Math.min(4,s0.s*(now.d/gest.start.d)));
+      o.r=s0.r+(now.a-gest.start.a);
+    }
+    applyTf(gestureTarget);
+  }else if(e.touches.length===2&&pinchDist0){
     const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
     setZoom(zoomLevel*(d/pinchDist0)); pinchDist0=d;
   }
 },{passive:true});
-A('#stage').addEventListener('touchend',e=>{if(e.touches.length<2)pinchDist0=null;},{passive:true});
+A('#stage').addEventListener('touchend',e=>{
+  if(e.touches.length===0){gest=null;pinchDist0=null;}
+  else if(gest) gest={start:touchInfo(e),tf0:{...tf[gestureTarget]}};
+  if(e.touches.length<2)pinchDist0=null;
+},{passive:true});
+
+/* Mouse fallback for desktop testing: drag to move, wheel to scale */
+let mouseDrag=null;
+A('#stage').addEventListener('mousedown',e=>{
+  if(onCtrlEl(e.target)) return;
+  if(manipActive()) mouseDrag={x:e.clientX,y:e.clientY,tf0:{...tf[gestureTarget]}};
+});
+window.addEventListener('mousemove',e=>{
+  if(mouseDrag&&manipActive()){
+    const o=tf[gestureTarget];
+    o.x=mouseDrag.tf0.x+(e.clientX-mouseDrag.x);
+    o.y=mouseDrag.tf0.y+(e.clientY-mouseDrag.y);
+    applyTf(gestureTarget);
+  }
+});
+window.addEventListener('mouseup',()=>mouseDrag=null);
+A('#stage').addEventListener('wheel',e=>{
+  if(onCtrlEl(e.target)) return;
+  e.preventDefault();
+  if(e.shiftKey&&manipActive()){       // Shift+wheel: scale skeleton / photo
+    const o=tf[gestureTarget];
+    o.s=Math.max(.25,Math.min(4,o.s*(e.deltaY<0?1.06:0.94)));
+    applyTf(gestureTarget);
+  }else{                               // plain wheel: camera zoom
+    setZoom(zoomLevel*(e.deltaY<0?1.05:0.95));
+  }
+},{passive:false});
+
+/* ================================================================
+   Feature 4: real-time pose matching + auto shutter
+   ================================================================ */
+function videoCoverRect(){
+  const v=A('#video');
+  const vw=v.videoWidth,vh=v.videoHeight,W=innerWidth,H=innerHeight;
+  const s=Math.max(W/vw,H/vh);
+  return {x:(W-vw*s)/2,y:(H-vh*s)/2,w:vw*s,h:vh*s};
+}
+function mapLivePoint(p){
+  const r=videoCoverRect();
+  let x=r.x+p.x*r.w, y=r.y+p.y*r.h;
+  if(facing==='user'&&mirror) x=innerWidth-x;
+  const cz=cssZoom(); // native zoom is already baked into the frame pixels
+  x=innerWidth/2+(x-innerWidth/2)*cz;
+  y=innerHeight/2+(y-innerHeight/2)*cz;
+  return {x,y};
+}
+function drawLiveSkeleton(lm){
+  const svg=A('#liveSkel');
+  svg.setAttribute('viewBox',`0 0 ${innerWidth} ${innerHeight}`);
+  if(!lm){svg.innerHTML='';return;}
+  svg.innerHTML=skeletonSvg(lm.map(p=>(p.visibility??1)<VIS?null:mapLivePoint(p)));
+}
+let lastVideoTime=-1, liveTimer=null;
+async function liveLoop(){
+  if(!liveOn) return;
+  const v=A('#video');
+  try{
+    if(v.videoWidth&&v.currentTime!==lastVideoTime&&landmarker){
+      lastVideoTime=v.currentTime;
+      const res=landmarker.detectForVideo(v,performance.now());
+      const lm=(res.landmarks&&res.landmarks[0])||null;
+      drawLiveSkeleton(lm);
+      let sim=0;
+      if(lm&&refNorm) sim=bestSim(normPose(lm,v.videoWidth,v.videoHeight));
+      matchEMA=matchEMA*0.6+sim*0.4;
+      const pct=Math.round(matchEMA*100);
+      const matched=matchEMA>=0.85;
+      const pill=A('#scorePill');
+      pill.textContent=lm?`重合度 ${pct}%${matched?' ✓':''}`:'畫面中未偵測到人';
+      pill.classList.toggle('matched',matched);
+      A('#skelLayer').classList.toggle('matched',matched);
+      if(matched) matchStreak++; else matchStreak=0;
+      if(matched&&matchStreak===4) toast('Pose Matched! 姿勢對齊成功',true);
+      if(autoShot&&matched&&matchStreak>=4&&Date.now()>cooldownUntil
+         &&A('#shot').style.display!=='flex'){
+        cooldownUntil=Date.now()+4000;
+        toast('Pose Matched! 0.5 秒後自動拍攝',true);
+        setTimeout(()=>A('#shutter').click(),500);
+      }
+    }
+  }catch(e){}
+  liveTimer=setTimeout(liveLoop,90);
+}
+async function startLive(){
+  if(!refNorm){toast('請先匯入含人物的參考照（看範例照 → 疊入）');return;}
+  try{ await ensureLandmarker(); }catch(e){ return; }
+  liveOn=true; matchEMA=0; matchStreak=0;
+  A('#aiBtn').classList.add('on');
+  A('#aiToggle').classList.add('ong');
+  A('#scorePill').style.display='block';
+  liveLoop();
+}
+function stopLive(){
+  liveOn=false; clearTimeout(liveTimer);
+  A('#aiBtn').classList.remove('on');
+  A('#aiToggle').classList.remove('ong');
+  A('#scorePill').style.display='none';
+  A('#skelLayer').classList.remove('matched');
+  A('#liveSkel').innerHTML='';
+}
+A('#aiBtn').onclick=()=>{ liveOn?stopLive():startLive(); };
+A('#aiToggle').onclick=()=>{ liveOn?stopLive():startLive(); resetPanelAutoCollapse(); };
+A('#autoBtn').onclick=()=>{
+  autoShot=!autoShot;
+  A('#autoBtn').classList.toggle('ong',autoShot);
+  if(autoShot&&!liveOn) startLive();
+  toast(autoShot?'自動快門已開啟：重合 85% 即拍':'自動快門已關閉');
+  resetPanelAutoCollapse();
+};
 
 /* -------- Other buttons -------- */
 A('#flipBtn').onclick=()=>{curDeviceId=null;facing=facing==='user'?'environment':'user';setZoom(1);startCam();};
@@ -707,8 +1317,8 @@ A('#refBtn').onclick=()=>{
       <a href="${xUrl}" target="_blank" rel="noopener" style="background:#fff;color:#ff2442">小紅書</a>
       <a href="${pUrl}" target="_blank" rel="noopener" style="background:#fff;color:#e60023">Pinterest</a>
     </div>
-    <div class="refCard"><h4>把參考圖疊入畫面</h4>
-      <p>找到一張欣賞的照片後，選擇上傳，它就會貼在相機畫面上讓你對照姿勢。</p>
+    <div class="refCard"><h4>把參考圖疊入畫面（AI 抓姿勢）</h4>
+      <p>找到喜歡的照片後上傳，AI 會自動把照片裡的人物轉成火柴人骨架疊在相機畫面上，還會標出環境水平線。對齊骨架變綠色就是拍照時機！</p>
       <a href="#" id="importBtn" style="background:var(--sage);color:#fff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>選擇參考圖疊入</a>
     </div>
     <p class="refNote">範例照來自第三方平台，著作權屬各作者，請勿直接複製。</p>`;
@@ -716,29 +1326,6 @@ A('#refBtn').onclick=()=>{
   A('#importBtn').onclick=e=>{e.preventDefault();A('#importInput').click();};
 };
 A('#refClose').onclick=()=>A('#refSheet').style.display='none';
-
-/* -------- Imported reference image -------- */
-let refMode='full';
-A('#importInput').onchange=e=>{
-  const f=e.target.files[0]; if(!f)return;
-  const img=A('#refImg');
-  img.src=URL.createObjectURL(f); img.style.display='block';
-  setRefMode(refMode); applyOpacity();
-  A('#refCtrl').style.display='block'; A('#refSheet').style.display='none';
-  e.target.value='';
-};
-function setRefMode(m){
-  refMode=m; const img=A('#refImg');
-  img.className=(m==='full')?'full':'corner tl';
-  A('#mFull').classList.toggle('on',m==='full');
-  A('#mCorner').classList.toggle('on',m==='corner');
-  A('#opSlider').parentElement.style.opacity=(m==='corner')?'.4':'1';
-}
-function applyOpacity(){ A('#refImg').style.opacity=(A('#opSlider').value/100).toFixed(2); }
-A('#mFull').onclick=()=>{setRefMode('full');applyOpacity();};
-A('#mCorner').onclick=()=>{setRefMode('corner');A('#refImg').style.opacity='1';};
-A('#opSlider').oninput=()=>{if(refMode==='full')applyOpacity();};
-A('#clearRef').onclick=()=>{A('#refImg').style.display='none';A('#refImg').src='';A('#refCtrl').style.display='none';};
 
 /* -------- Shutter -------- */
 A('#shutter').onclick=()=>{
@@ -755,15 +1342,27 @@ function flash(){const f=A('#flash');f.style.transition='none';f.style.opacity='
 A('#retake').onclick=()=>A('#shot').style.display='none';
 A('#save').onclick=()=>{const a=document.createElement('a');a.href=A('#shotImg').src;a.download='pose-'+Date.now()+'.jpg';a.click();};
 
+/* -------- Resize: redraw layers -------- */
+window.addEventListener('resize',()=>{
+  drawRefSkeleton();
+  drawHorizons(lastHorizons);
+});
+
 /* -------- Intro -------- */
 A('#start').onclick=async()=>{
   const intro=A('#intro'); intro.style.opacity='0';
   setTimeout(()=>intro.style.display='none',500);
   await enumCameras();
   await startCam();
+  // preload AI model in the background so import feels instant
+  ensureLandmarker().catch(()=>{});
 };
 
 buildPoses();
+
+/* PWA: offline shell + installability (https only, so local dev stays uncached) */
+if('serviceWorker' in navigator && location.protocol==='https:')
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
 </body>
 </html>
